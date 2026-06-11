@@ -16,6 +16,7 @@ suggest long-term optimized portfolios. Built in phases: local Streamlit + SQLit
 [docs/PROMPTS.md](docs/PROMPTS.md) (build prompts) ·
 [docs/AGENT_MODELS.md](docs/AGENT_MODELS.md) (team models) ·
 [docs/WORKFLOW.md](docs/WORKFLOW.md) (git + resume playbook) ·
+[docs/TOOLING.md](docs/TOOLING.md) (tools & context efficiency) ·
 `docs/PLAN.md` (the executable plan, once created).
 
 ## Version control (always)
@@ -54,3 +55,12 @@ Lead + `quant-ml-engineer` run on **Opus**; `backend-data-engineer`,
 Keep all finance/ML logic **framework-free** in `core/` (no Streamlit/React
 imports) so the UI can be swapped later without rewriting logic. Layers:
 `data/ · core/ · storage/ · app/ · jobs/ · tests/`.
+
+## Tools & context efficiency
+
+Use **progressive disclosure** — don't pay context for instructions you aren't
+using. Sometimes-needed domain knowledge → a **Skill** (loads on match), not this
+file; heavy role context → a **subagent**; only enable **MCP servers/plugins you
+actually use** (they tax every turn). This is a free-data (yfinance) project — the
+paid/enterprise finance plugins (S&P Global/Kensho, `anthropics/financial-services`,
+the accounting `finance` plugin) are **out of scope**. Details: [docs/TOOLING.md](docs/TOOLING.md).

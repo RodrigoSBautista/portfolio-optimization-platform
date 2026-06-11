@@ -27,6 +27,9 @@ _Last updated: 2026-06-10_
   `.gitignore`.
 - Agent-teams enabled; team model config decided (lead + quant-ml on Opus, others
   on Sonnet; plan-before-execute).
+- Tooling policy set (`docs/TOOLING.md`): progressive disclosure; paid/enterprise
+  finance plugins (S&P Global/Kensho, anthropics/financial-services, accounting
+  `finance`) ruled out of scope for this free-data project.
 
 ## Blocked / open questions
 

@@ -1,0 +1,53 @@
+# --- Secrets ---
+.env
+.env.*
+*.key
+secrets.toml
+.streamlit/secrets.toml
+
+# --- Databases (never commit user data) ---
+*.db
+*.sqlite
+*.sqlite3
+
+# --- Data caches (prices / parquet) ---
+data/cache/
+*.parquet
+*.feather
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.python-version
+*.egg-info/
+build/
+dist/
+.eggs/
+
+# --- UV ---
+# keep uv.lock committed for reproducibility; ignore local caches only
+.uv/
+
+# --- Testing / tooling ---
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# --- Notebooks ---
+.ipynb_checkpoints/
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# --- Claude Code (personal/local only; settings.json IS committed) ---
+.claude/settings.local.json
+.claude/*.lock

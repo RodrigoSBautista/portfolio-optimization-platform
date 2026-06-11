@@ -1,0 +1,38 @@
+{
+  "model": "opus",
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  },
+  "permissions": {
+    "allow": [
+      "Read",
+      "Edit",
+      "Write",
+      "Bash(mkdir:*)",
+      "Bash(rm:*)",
+      "Bash(rmdir:*)",
+      "Bash(mv:*)",
+      "Bash(cp:*)",
+      "Bash(touch:*)",
+      "Bash(python:*)",
+      "Bash(pip:*)",
+      "Bash(uv:*)",
+      "Bash(jupyter:*)",
+      "Bash(git:*)",
+      "Bash(gh:*)",
+      "Bash(docker:*)",
+      "PowerShell(New-Item:*)",
+      "PowerShell(Remove-Item:*)",
+      "PowerShell(Move-Item:*)",
+      "PowerShell(Copy-Item:*)",
+      "PowerShell(Rename-Item:*)",
+      "PowerShell(python:*)",
+      "PowerShell(pip:*)",
+      "PowerShell(uv:*)",
+      "PowerShell(jupyter:*)",
+      "PowerShell(git:*)",
+      "PowerShell(gh:*)",
+      "PowerShell(docker:*)"
+    ]
+  }
+}

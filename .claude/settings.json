@@ -34,5 +34,19 @@
       "PowerShell(gh:*)",
       "PowerShell(docker:*)"
     ]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File .claude/hooks/auto-commit.ps1",
+            "timeout": 30,
+            "statusMessage": "Checkpointing to git…"
+          }
+        ]
+      }
+    ]
   }
 }

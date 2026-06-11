@@ -58,9 +58,9 @@ imports) so the UI can be swapped later without rewriting logic. Layers:
 
 ## Tools & context efficiency
 
-Use **progressive disclosure** — don't pay context for instructions you aren't
-using. Sometimes-needed domain knowledge → a **Skill** (loads on match), not this
-file; heavy role context → a **subagent**; only enable **MCP servers/plugins you
-actually use** (they tax every turn). This is a free-data (yfinance) project — the
-paid/enterprise finance plugins (S&P Global/Kensho, `anthropics/financial-services`,
-the accounting `finance` plugin) are **out of scope**. Details: [docs/TOOLING.md](docs/TOOLING.md).
+When reusable domain knowledge or a workflow starts repeating, **create a Skill**
+for it (loads on demand) instead of bloating prompts or this file — lead and
+teammates decide when it's worth it. Only enable MCP servers/plugins you actually
+use. This is a free-data (yfinance) project: the paid/enterprise finance plugins
+(S&P Global/Kensho, `anthropics/financial-services`, the accounting `finance`
+plugin) are **out of scope**. Details: [docs/TOOLING.md](docs/TOOLING.md).

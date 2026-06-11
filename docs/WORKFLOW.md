@@ -42,6 +42,12 @@ Run `git status` before every commit to confirm none are staged.
   `feat/core-simulation`); merge to `main` via PR once green. Keep `main` working.
 - **Secrets never land in git.** If one slips in, rotate it — don't just delete
   the line.
+- **Auto-checkpoints.** A `Stop` hook (`.claude/hooks/auto-commit.ps1`) commits +
+  pushes a timestamped `chore: checkpoint` at most once every ~10 min when the
+  tree is dirty — a safety net against interruptions, **not** a replacement for
+  meaningful, well-messaged commits at logical milestones. Review or disable it
+  via `/hooks`; change the cadence by editing the `10 minutes ago` throttle in the
+  script.
 
 ## 3. Resume-from-interruption playbook
 

@@ -8,11 +8,10 @@ _Last updated: 2026-06-10_
 
 ## Next step (start here on resume)
 
-- Decide when to begin **Phase 0 (Foundations)**: `git init` + GitHub remote +
-  `.gitignore` + `uv` environment. No application code yet.
+- **Run Prompt 1** (from `docs/PROMPTS.md`) → produces `docs/PLAN.md`.
+- Then **Prompt 2** → creates the 4 agents in `.claude/agents/`.
+- Set up the **UV environment** (`uv init`) when Phase 1 build begins.
 - **Remote (SSH):** `git@github.com:RodrigoSBautista/portfolio-optimization-platform.git`
-  (auth via the local `~/.ssh/id_ed25519` key — confirm it's added to GitHub and
-  the repo exists before pushing).
 
 ## In progress
 
@@ -20,6 +19,8 @@ _Last updated: 2026-06-10_
 
 ## Done
 
+- **Phase 0:** git repo initialized, SSH auth working, first commit pushed to
+  `origin/main` (merged with the remote's LICENSE/README).
 - Project decision docs written: `docs/ARCHITECTURE.md`, `docs/PROMPTS.md`,
   `docs/AGENT_MODELS.md`.
 - Standing conventions added: `CLAUDE.md`, `docs/WORKFLOW.md`, this file,

@@ -8,11 +8,10 @@ _Last updated: 2026-06-13_
 
 ## Next step (start here on resume)
 
-- Begin **Phase 1, step 1** (env scaffold, owner: devops-qa): `uv init` + deps
-  (pandas, numpy, yfinance, SQLAlchemy, alembic, passlib[bcrypt]/argon2, streamlit,
-  plotly, matplotlib, pytest, ruff), commit `uv.lock`, configure ruff/pytest, write
-  `.env.example`, README stub + disclaimer. Then Phase 1 step 2 (data layer). See
-  `docs/PLAN.md §4`.
+- Begin **Phase 1, step 2** (data layer, owner: backend-data): `data/provider.py`
+  (yfinance wrapper, dividend-adjusted / total-return prices) + `data/cache.py`
+  (parquet cache + "last refreshed"); handle delisted/non-overlapping/holidays;
+  unit-tested. See `docs/PLAN.md §4`.
 - **Remote (SSH):** `git@github.com:RodrigoSBautista/portfolio-optimization-platform.git`
 
 ## In progress
@@ -21,6 +20,12 @@ _Last updated: 2026-06-13_
 
 ## Done
 
+- **Phase 1 · step 1 — env scaffold** (branch `feat/env-scaffold`): uv project
+  (`pyproject.toml` requires-python >=3.11, `uv.lock` committed), runtime + dev deps,
+  layered framework-free skeleton (`data/ core/ storage/ app/ jobs/ tests/`),
+  `core/constants.py` (disclaimer + default benchmark), ruff + pytest config (green,
+  6 smoke tests), `.env.example` (un-ignored), README run instructions. uv installed
+  to `C:\Users\edu_s\.local\bin`.
 - **Prompt 2 — four reusable subagents created** in `.claude/agents/`:
   `quant-ml-engineer`, `backend-data-engineer`, `frontend-viz-engineer`,
   `devops-qa-engineer` (all `model: opus`, plan-before-execute, standing

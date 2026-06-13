@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "markitdown": {
+      "command": "C:\\Program Files\\Python310\\python.exe",
+      "args": ["-m", "markitdown_mcp"],
+      "type": "stdio"
+    }
+  }
+}

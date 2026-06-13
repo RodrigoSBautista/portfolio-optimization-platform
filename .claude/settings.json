@@ -32,9 +32,11 @@
       "PowerShell(jupyter:*)",
       "PowerShell(git:*)",
       "PowerShell(gh:*)",
-      "PowerShell(docker:*)"
+      "PowerShell(docker:*)",
+      "mcp__markitdown__convert_to_markdown"
     ]
   },
+  "enabledMcpjsonServers": ["markitdown"],
   "hooks": {
     "Stop": [
       {

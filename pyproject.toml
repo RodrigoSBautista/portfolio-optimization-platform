@@ -1,0 +1,35 @@
+[project]
+name = "portfolio-platform"
+version = "0.1.0"
+description = "Investment portfolio simulation & optimization platform"
+requires-python = ">=3.11"
+dependencies = [
+    "alembic>=1.18.4",
+    "matplotlib>=3.11.0",
+    "numpy>=2.4.6",
+    "pandas>=3.0.3",
+    "passlib[bcrypt]>=1.7.4",
+    "plotly>=6.8.0",
+    "pyarrow>=24.0.0",
+    "sqlalchemy>=2.0",
+    "streamlit>=1.58.0",
+    "yfinance>=1.4.1",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+# pycodestyle errors, pyflakes, isort, pyupgrade, flake8-bugbear
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.0",
+    "ruff>=0.15.17",
+]

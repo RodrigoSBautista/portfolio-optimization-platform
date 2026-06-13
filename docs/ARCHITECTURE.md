@@ -1,10 +1,10 @@
 # Investment Portfolio Simulation & Optimization Platform
 ## Tools, Frameworks & Approach — Decision Guide
 
-> **Status:** Decision/research document. **No application code is written yet.**
-> This file compares the options for each part of the stack (with pros/cons and
-> considerations), recommends a default, proposes a project structure, and lays
-> out the order in which to build. Use it to lock in choices before any coding.
+> **Status:** Decision record fed to the build agents. It states the **finalized
+> decisions** and the **non-obvious considerations** — deliberately *without*
+> pre-selecting optimization or analytics techniques, so the research the agents
+> do in those areas isn't biased.
 
 ---
 
@@ -31,57 +31,29 @@ quantitative finance, and (in later phases) full-stack software engineering.
 - **First milestone:** Historical growth simulation.
 - **Asset universe:** **US stocks/ETFs only** → yfinance is a clean fit; FX/global
   complexity avoided for now.
-- **Users:** **Single-user now, multi-user later** → no auth yet, but design the
-  DB schema with a nullable/forward-compatible `user` concept so adding accounts
-  later is cheap.
-- **ML emphasis:** **Balanced** → solid analytics core (Monte Carlo, efficient
-  frontier, PCA/clustering) plus **one carefully-caveated** forecasting feature.
-
-The remaining sections list alternatives too, so choices can still be revisited.
+- **Users:** **Single-user now, multi-user later** → design the DB schema with a
+  forward-compatible `user` concept so adding accounts later is cheap.
+- **ML emphasis:** **Balanced** — a solid analytics core plus **one
+  carefully-caveated** forecasting feature; specific techniques are chosen during
+  the build (researched, not pre-listed).
 
 ---
 
 ## 3. Decision areas
 
-Each subsection: the options, pros/cons, a recommendation, and considerations.
-
 ### A. Language & packaging
 
-| Option | Pros | Cons |
-|---|---|---|
-| **Python** | Best ecosystem for finance/ML; plays to your strengths | Slower than compiled langs (irrelevant here) |
-| R | Strong stats/finance packages | Weaker for web apps / production services |
-| JS/TS only | One language across stack | Poor quant/ML libraries |
-
-**Recommendation: Python 3.11+.**
-
-Packaging/env manager:
-- **`venv` + `requirements.txt`** — simplest, universally understood. *Best for learning.*
-- **`uv`** — very fast, modern, increasingly standard. *Good "I know current tooling" signal.*
-- **Poetry** — robust dependency resolution + lockfile. *Slightly heavier.*
-
-**Recommendation:** `venv`+`requirements.txt` to start, or `uv` if you want to
-show modern tooling. Pin versions for reproducibility either way.
-
-**Considerations:** keep a lockfile; document Python version; one virtual env per
-project.
+**Decision: Python 3.11+**, managed with **`uv`** (environment + package manager).
+Commit `uv.lock`; pin the Python version; one environment per project.
 
 ---
 
 ### B. Market data source
 
-| Option | Cost | Coverage | Notes |
-|---|---|---|---|
-| **`yfinance`** | Free, no key | Global stocks/ETFs, decades of daily data, dividends/splits | Unofficial Yahoo scraper — can break; rate-limit yourself |
-| **Tiingo** | Free tier + paid | US equities/ETFs, good quality | Needs API key; clean adjusted data |
-| **Financial Modeling Prep** | Free tier + paid | Prices + fundamentals | Key required |
-| **Alpha Vantage** | Free tier (tight limits) | Global | 5 calls/min on free tier |
-| **Polygon.io** | Free tier + paid | High quality, real-time options | Best reliability when you scale |
-| **EOD Historical Data** | Paid (cheap) | Very broad global | Good if you need many exchanges |
-
-**Recommendation:** **`yfinance`** for v1, **hidden behind a thin wrapper** so the
-source can be swapped later without touching business logic. Cache downloaded
-prices locally (parquet) to reduce calls and survive outages.
+**Decision: `yfinance`** (free, no key; US stocks/ETFs, decades of daily history,
+dividends/splits) behind a **thin wrapper** so the source can be swapped later
+without touching business logic. Cache downloaded prices to **parquet** to reduce
+calls and survive outages.
 
 **Considerations (important):**
 - Use **dividend-adjusted / total-return** prices, or growth will be understated.
@@ -92,48 +64,23 @@ prices locally (parquet) to reduce calls and survive outages.
 
 ---
 
-### C. Portfolio optimization library
+### C. Portfolio optimization
 
-| Option | Pros | Cons |
-|---|---|---|
-| **PyPortfolioOpt** | Purpose-built, well-documented; covers mean-variance, max-Sharpe, min-vol, efficient frontier, **HRP**, Black-Litterman | Less exotic than riskfolio |
-| **riskfolio-lib** | Many risk measures, advanced models | Steeper learning curve; more than you need now |
-| **Hand-rolled (numpy/cvxpy)** | Max learning, full control | Reinventing solved problems; error-prone |
-
-**Recommendation: PyPortfolioOpt.** It maps exactly onto your "well-known but not
-complicated" brief.
-
-**Techniques that fit "simple + long-term + low-churn":**
-
-| Technique | What it does | Why it fits long-term investing |
-|---|---|---|
-| Equal-weight (1/N) | Same weight to each asset | Robust baseline; no estimation error; trivial to explain |
-| Max-Sharpe (Markowitz) | Best risk-adjusted return | Classic, recruiter-recognizable |
-| Min-volatility | Lowest-risk portfolio | Good for conservative long-horizon |
-| Risk parity | Equal risk contribution per asset | Diversification-focused |
-| **Hierarchical Risk Parity (HRP)** | Clusters correlated assets, allocates by risk | Modern, robust to estimation error, great recruiter signal |
-| Black-Litterman | Blends market equilibrium with your views | Optional, more advanced |
-
-**Considerations:** default to **annual or quarterly rebalancing**, not daily —
-this directly honors the "avoid constant buying/selling" goal. Always show an
-equal-weight baseline so users see whether optimization actually helped.
+**Not pre-decided here — on purpose.** The Phase 2 optimization **library and
+technique** are intentionally left open so the choice isn't biased: the
+`quant-ml-engineer` runs **parallel deep research**, ranks the candidates, and
+presents a summary for the user to **select** before implementing (see
+`docs/PROMPTS.md` Prompt 1, Phase 2). Compare any suggestion against a simple
+baseline.
 
 ---
 
 ### D. Historical simulation / backtesting approach
 
-| Option | Pros | Cons |
-|---|---|---|
-| **Plain pandas/numpy** | Full control, transparent, easy to test, no magic | You write the accounting (contributions, rebalancing) |
-| **bt** | Tree-based backtests, clean API | Another dependency to learn |
-| **vectorbt** | Very fast, vectorized, rich analytics | Steep API; overkill for buy-and-hold |
-| **backtrader** | Mature, event-driven | Geared to active trading, heavier |
-
-**Recommendation:** **plain pandas** for the historical-growth simulation. Your
-use case is buy-and-hold with periodic rebalancing, which is simple arithmetic —
-a dedicated backtesting engine adds complexity you don't need, and rolling your
-own is more transparent and more testable. Reach for `vectorbt`/`bt` only if you
-later want heavy multi-strategy backtesting.
+**Decision: plain pandas/numpy.** The use case is buy-and-hold with periodic
+rebalancing — simple, transparent arithmetic that's easy to test. Reach for a
+dedicated engine (`vectorbt`/`bt`) only if you later want heavy multi-strategy
+backtesting.
 
 **Considerations:** support both **lump-sum** and **recurring contributions**
 (dollar-cost averaging); compute against a **benchmark** (e.g. SPY).
@@ -142,40 +89,25 @@ later want heavy multi-strategy backtesting.
 
 ### E. Numerics & analysis
 
-- **pandas + numpy** — the backbone. Non-negotiable.
-- **scipy / statsmodels** — for stats (regressions, distributions) in analytics.
-- **scikit-learn** — PCA, clustering, any ML.
-
-**Recommendation:** pandas/numpy core; add scikit-learn when you reach analytics.
+- **pandas + numpy** — the backbone.
+- **scipy / statsmodels** — stats when needed.
+- **scikit-learn** — ML/analytics when needed.
 
 ---
 
 ### F. Visualization
 
-| Option | Pros | Cons |
-|---|---|---|
-| **Plotly** | Interactive, web-ready, integrates with Streamlit/React | Larger payloads |
-| **matplotlib/seaborn** | Great for notebooks/static analysis | Not interactive for web |
-| Altair | Declarative, clean | Smaller ecosystem |
-
-**Recommendation:** **Plotly** for the app (interactive growth charts, efficient
-frontier); **matplotlib/seaborn** for notebook exploration.
+**Decision: matplotlib by default; Plotly where interactivity clearly helps**
+(e.g. interactive charts in the app). matplotlib/seaborn for notebook exploration.
 
 ---
 
-### G. UI / delivery layer (the biggest fork)
+### G. UI / delivery layer
 
-| Option | Pros | Cons | Recruiter signal |
-|---|---|---|---|
-| **Streamlit** | Fastest to build, pure Python, free hosting, ideal for data apps | Less control over UX; not "real" web eng | Data/analytics |
-| Dash (Plotly) | More layout control, still Python | More boilerplate than Streamlit | Data + some web |
-| Gradio | Trivial ML demos | Too limited for a multi-page product | ML demos |
-| **FastAPI + React** | Production-grade, full separation, scalable | Much more work; two languages | Full-stack eng |
-
-**Recommendation:** **Streamlit now, split to FastAPI + React later.** Build the
-MVP in Streamlit to validate the finance logic fast, then extract a FastAPI
-backend + React frontend to demonstrate engineering breadth. The architecture in
-§4 keeps this split cheap by isolating all logic in a framework-free `core/`.
+**Decision: Streamlit now → FastAPI + React later.** Build the MVP in Streamlit to
+validate the finance logic fast, then extract a FastAPI backend + React frontend
+to demonstrate engineering breadth. The framework-free `core/` (see §4) keeps that
+split cheap.
 
 **Considerations:** never put business logic in Streamlit callbacks — keep it in
 `core/` so both Streamlit and the future API call the same code.
@@ -184,83 +116,51 @@ backend + React frontend to demonstrate engineering breadth. The architecture in
 
 ### H. Storage / database
 
-| Option | Pros | Cons |
-|---|---|---|
-| **SQLite** | Zero-config, file-based, perfect for dev/MVP | Single-writer; not for high concurrency |
-| **PostgreSQL** | Production-grade, concurrent, time-series friendly | Needs a server/hosting |
-| Parquet files | Great for cached price data | Not for transactional/user data |
-| Time-series DB (TimescaleDB/InfluxDB) | Optimized for many ticks | Overkill for daily data |
+**Decision: SQLite via SQLAlchemy** now → **migrate to PostgreSQL** when you
+deploy / add the API. Cache raw prices as **parquet**, separate from the
+transactional DB. Using SQLAlchemy from day one makes the SQLite→Postgres move
+nearly free.
 
-**Recommendation:** **SQLite via SQLAlchemy** for phase 1, **migrate to
-PostgreSQL** when you deploy / add the API. Cache raw prices as **parquet**
-separately from the transactional DB. Using SQLAlchemy from day one makes the
-SQLite→Postgres move nearly free.
-
-**Considerations:** model `portfolios`, `holdings`, and `daily_valuations`
-cleanly (with a forward-compatible `user` column so multi-user is cheap later);
-daily data volume is tiny so don't over-engineer with a TSDB.
+**Considerations:** model `portfolios`, `holdings`, and `daily_valuations` cleanly
+(with a forward-compatible `user` column so multi-user is cheap later); daily data
+volume is tiny — don't over-engineer with a time-series DB.
 
 ---
 
 ### I. Scheduling (daily performance tracking)
 
-| Option | Pros | Cons |
-|---|---|---|
-| **APScheduler** | In-process Python scheduler, simple | Runs only while your app/process runs |
-| **GitHub Actions cron** | Free, serverless, no infra | Coupled to GitHub; not for secrets-heavy jobs |
-| OS cron / Task Scheduler | Built in | Machine must be on |
-| Airflow / Prefect | Powerful orchestration | Massive overkill here |
-
-**Recommendation:** **GitHub Actions cron** (or APScheduler if always-on) for the
-daily price pull + valuation write. Avoid Airflow — way too heavy for one daily
-job.
+**Decision: GitHub Actions cron** (or APScheduler if always-on) for the daily
+price pull + valuation write.
 
 **Considerations:** make the job **idempotent** (safe to re-run); handle days the
 market is closed; store a "last refreshed" timestamp.
 
 ---
 
-### J. ML / advanced analytics (the recruiter differentiator)
+### J. ML / advanced analytics
 
-Options, roughly easy→ambitious:
-
-| Technique | Value | Honesty note |
-|---|---|---|
-| **Monte Carlo forward projection** | Projects future growth with confidence bands; pairs naturally with historical sim | Communicate it as a distribution, not a prediction |
-| Efficient frontier visualization | Classic, visually impressive | Standard, low risk |
-| PCA / correlation clustering | Quantifies diversification; explains HRP | Strong analytics signal |
-| Regime detection (e.g. HMM) | "Sophisticated" angle | Don't oversell |
-| Return/volatility forecasting (ML) | Eye-catching | **Price prediction is genuinely hard** — framing the limits honestly is itself a maturity signal recruiters respect |
-
-**Recommendation (balanced):** build a solid analytics core — **Monte Carlo
-projection** + **efficient frontier** + **PCA/clustering diversification** — plus
-**one** carefully-caveated forecasting feature. Overclaiming predictive power is a
-red flag to knowledgeable reviewers.
+**Not pre-listed here — on purpose.** Specific analytics techniques are
+researched/chosen during the build rather than prescribed up front, so the choice
+isn't biased. **Guardrail:** never overclaim price prediction — present any
+forecast as a distribution / uncertainty band, not a point prediction.
 
 ---
 
 ### K. Deployment / hosting
 
-| Option | Cost | Best for |
-|---|---|---|
-| **Streamlit Community Cloud** | Free | The Streamlit MVP |
-| **Hugging Face Spaces** | Free | Streamlit/Gradio demos, ML-flavored audience |
-| Render / Railway / Fly.io | Free–cheap | FastAPI + React + Postgres later |
-| AWS/GCP/Azure | Pay-as-you-go | Production scale (overkill early) |
-
-**Recommendation:** **Streamlit Community Cloud** or **HF Spaces** for the MVP;
-**Render/Railway** when it becomes a FastAPI+React app with Postgres.
+**Decision: Streamlit Community Cloud (or Hugging Face Spaces) for the MVP;
+Render/Railway** when it becomes a FastAPI + React app with Postgres. (See §6.5 for
+the Streamlit persistence gotcha.)
 
 ---
 
 ### L. Dev tooling
 
-- **Version control:** Git + GitHub from day one (this project isn't a git repo
-  yet — initializing it is the natural first step). A clean commit history and
+- **Version control:** Git + GitHub from day one. A clean commit history and
   README are themselves recruiter signals.
 - **Testing:** `pytest` — especially for `core/` finance logic.
-- **Formatting/lint:** `ruff` (fast, all-in-one) + optionally `black`.
-- **CI:** GitHub Actions to run tests/lint on push (shows engineering maturity).
+- **Formatting/lint:** `ruff` (fast, all-in-one).
+- **CI:** GitHub Actions to run tests/lint on push.
 - **Types:** optional `mypy` on `core/` for an extra quality signal.
 
 ---
@@ -275,16 +175,16 @@ ml_project/
   data/            # price fetching + caching (yfinance wrapper, parquet cache)
   core/            # PURE domain logic — no UI, no framework imports
     simulation.py  # historical growth: lump-sum & recurring contributions
-    optimization.py# PyPortfolioOpt wrappers (equal-wt, max-Sharpe, min-vol, HRP)
-    montecarlo.py  # forward projection with confidence bands (later)
+    optimization.py# portfolio optimization (library + technique chosen in Phase 2)
+    analytics.py   # forward projections / diversification (techniques TBD, later)
     metrics.py     # CAGR, volatility, Sharpe, max drawdown vs benchmark
   storage/         # SQLAlchemy models + repository (SQLite -> Postgres)
-  app/             # Streamlit pages (thin: call core/, render Plotly)
+  app/             # Streamlit pages (thin: call core/, render charts)
   jobs/            # scheduled daily refresh (GitHub Actions / APScheduler)
   notebooks/       # exploration (portfolio_theories.ipynb lives here)
   docs/            # this guide and future design notes
   tests/           # pytest, focused on core/
-  requirements.txt
+  pyproject.toml
   README.md
 ```
 
@@ -297,21 +197,21 @@ same code Streamlit already uses. No rewrite of finance logic.
 
 Each phase is independently demoable.
 
-1. **Phase 0 — Foundations.** `git init`, repo skeleton, virtual env,
-   `requirements.txt`, README, `pytest` set up. (No real features yet.)
+1. **Phase 0 — Foundations.** `git init` + GitHub remote, `uv` env +
+   `pyproject.toml`, `.gitignore`, README, `pytest` set up. (No real features yet.)
 2. **Phase 1 — Historical growth simulation (first milestone).**
    `data/` fetcher + parquet cache → `core/simulation.py` (lump-sum + recurring)
    → `core/metrics.py` (CAGR, vol, Sharpe, drawdown, benchmark vs SPY) →
-   Streamlit page with a Plotly growth chart + metrics table.
-3. **Phase 2 — Optimization & suggestions.** `core/optimization.py`
-   (equal-weight, max-Sharpe, min-vol, HRP) + efficient-frontier plot; a
-   Streamlit page that feeds suggested weights straight into the Phase 1 sim.
+   Streamlit page with a growth chart + metrics table.
+3. **Phase 2 — Optimization & suggestions.** `core/optimization.py` (technique
+   selected via Phase 2 research) + a comparison view; a Streamlit page that feeds
+   suggested weights straight into the Phase 1 sim.
 4. **Phase 3 — Persisted portfolios + daily tracking.** `storage/` schema
    (portfolios, holdings, daily_valuations) + `jobs/` scheduled daily refresh;
    dashboard reads stored history.
-5. **Phase 4 — Advanced analytics.** Monte Carlo projection with confidence
-   bands; PCA/correlation-clustering diversification view; one caveated
-   forecasting feature.
+5. **Phase 4 — Advanced analytics.** Forward projections, diversification
+   analysis, and one caveated forecasting feature (techniques chosen during the
+   build).
 6. **Phase 5 — Split the stack.** Extract `core/` behind a FastAPI REST API;
    build a React frontend; migrate to Postgres; add multi-user auth; deploy to
    Render/Railway.
@@ -326,7 +226,7 @@ Each phase is independently demoable.
   understated; document the choice.
 - **Data robustness.** Delisted tickers, non-overlapping histories, currency
   differences, and holidays belong in the `data/` layer, not `core/`.
-- **Reproducibility.** Pin dependencies; seed Monte Carlo runs; cache data.
+- **Reproducibility.** Pin dependencies; seed stochastic runs; cache data.
 - **Data licensing.** Re-read provider terms before any public/commercial deploy.
 - **Honesty about ML.** Don't claim to predict prices; present projections as
   probability distributions.
@@ -370,27 +270,25 @@ achievable as stated. Decide the trade-off consciously.
 
 ## 7. Recommended default stack (one-glance summary)
 
-| Layer | Default pick | Main alternative |
+| Layer | Pick | Note |
 |---|---|---|
 | Language | Python 3.11+ | — |
-| Env/packaging | venv + requirements.txt | uv |
-| Market data | yfinance (wrapped) | Tiingo / Polygon |
-| Optimization | PyPortfolioOpt | riskfolio-lib |
-| Simulation | plain pandas | vectorbt / bt |
-| ML/analytics | scikit-learn + Monte Carlo | statsmodels |
-| Charts | Plotly | matplotlib/seaborn |
-| UI (now) | Streamlit | Dash |
+| Env/packaging | uv | commit `uv.lock` |
+| Market data | yfinance (wrapped) | parquet cache; swap-able |
+| Simulation | plain pandas | — |
+| Charts | matplotlib (Plotly when interactive) | — |
+| UI (now) | Streamlit | — |
 | UI (later) | FastAPI + React | — |
 | Storage | SQLite → PostgreSQL | parquet for prices |
-| Scheduling | GitHub Actions cron | APScheduler |
-| Hosting | Streamlit Cloud / HF Spaces | Render / Railway |
-| Dev tooling | Git, pytest, ruff, GH Actions CI | mypy |
+| Scheduling | GitHub Actions cron | APScheduler if always-on |
+| Hosting | Streamlit Cloud now → Render/Railway later | — |
+| Dev tooling | Git, pytest, ruff, GH Actions CI | mypy optional |
+
+> Optimization library/technique and the advanced-analytics methods are
+> intentionally **omitted** here — they're researched and chosen during the build
+> (see §3C and §3J).
 
 ---
 
-## 8. Remaining minor question
-
-- Packaging: `venv` (simple) vs `uv` (modern signal)? — can be decided at Phase 0.
-
-> The scope questions are settled (see §2). The next step, when ready, is Phase 0
-> (repo + skeleton) — a separate go-ahead. No application code has been written.
+> Scope questions are settled (see §2). Phase 0 (repo + `uv` skeleton) is done; the
+> next step is generating the executable plan (`docs/PLAN.md`) via Prompt 1.

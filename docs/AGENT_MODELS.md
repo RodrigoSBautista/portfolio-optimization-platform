@@ -12,11 +12,12 @@ official docs ([agent-teams](https://code.claude.com/docs/en/agent-teams),
 
 - **Teammates do NOT inherit the lead's model by default.** You must set it
   explicitly (per-agent frontmatter, the spawn prompt, `/config`, or an env var).
-- **`opusplan` is NOT a valid teammate model.** It is a *main-session-only* mode
-  (Opus while in plan mode → Sonnet for execution). A teammate's plan→execution
-  transition is gated by the **lead's approval**, not an automatic model switch,
-  so `opusplan` has nothing to hook into. Valid values are `opus`, `sonnet`,
-  `haiku`, `inherit`, or a full model ID.
+- **`opusplan` is NOT a valid teammate model.** It's a *main-session-only* mode
+  that deliberately drops from Opus (planning) to a cheaper model (execution) —
+  the opposite of what we want. Teammates have no such auto-switch (their
+  plan→execution transition is gated by the **lead's approval**). Valid teammate
+  model values are `opus`, `sonnet`, `haiku`, `inherit`, or a full model ID — and
+  **here we use `opus` for both planning and execution.**
 - **Teammates DO have a real plan mode.** They can be required to draft a plan in
   read-only mode and wait for the lead to approve before implementing.
 
@@ -29,7 +30,7 @@ Four supported mechanisms (highest-level override last):
 | # | Mechanism | How | Accepts `opusplan`? |
 |---|---|---|---|
 | 1 | **Subagent `model:` frontmatter** | `model:` in `.claude/agents/<name>.md`; honored when that definition is spawned as a teammate | No |
-| 2 | **In the spawn prompt** | Tell the lead in natural language, e.g. *"Use Sonnet for each teammate."* | No |
+| 2 | **In the spawn prompt** | Tell the lead in natural language, e.g. *"Use Opus for each teammate."* | No |
 | 3 | **`/config` → Default teammate model** | Sets the fallback when the prompt doesn't specify; choose *"Default (leader's model)"* to make teammates follow the lead | No |
 | 4 | **`CLAUDE_CODE_SUBAGENT_MODEL` env var** | Blanket override for **all** subagents/teammates; overrides the per-invocation `model` and the frontmatter. Set to `inherit` for normal resolution | No |
 
@@ -55,9 +56,9 @@ forced to one model — it overrides the frontmatter.
 > it with feedback. If rejected, the teammate stays in plan mode, revises… Once
 > approved, the teammate exits plan mode and begins implementation."*
 
-This gives a powerful pattern: **the Opus lead reviews every Sonnet teammate's
-plan before any code is written** — Opus-level judgment over all planning, while
-execution stays on cheaper Sonnet.
+This gives a powerful pattern: **the lead reviews every teammate's plan before any
+code is written** — Opus-level judgment over all planning, and (with every
+teammate on Opus too) over all execution as well.
 
 ---
 
@@ -67,17 +68,24 @@ execution stays on cheaper Sonnet.
 |---|---|---|---|
 | **Team lead** (orchestrating session) | `.claude/settings.json` → `"model": "opus"` | **Opus** | Heaviest reasoning: architecture, coordination, reviewing/approving teammate plans |
 | **quant-ml-engineer** | `.claude/agents/quant-ml-engineer.md` → `model: opus` | **Opus** | Finance/ML correctness is subtle and high-stakes |
-| **backend-data-engineer** | `…/backend-data-engineer.md` → `model: sonnet` | **Sonnet** | Solid execution work; cheaper/faster |
-| **frontend-viz-engineer** | `…/frontend-viz-engineer.md` → `model: sonnet` | **Sonnet** | UI build-out; cheaper/faster |
-| **devops-qa-engineer** | `…/devops-qa-engineer.md` → `model: sonnet` | **Sonnet** | Tooling/CI/tests; cheaper/faster |
+| **backend-data-engineer** | `…/backend-data-engineer.md` → `model: opus` | **Opus** | Max quality across the board (chosen) |
+| **frontend-viz-engineer** | `…/frontend-viz-engineer.md` → `model: opus` | **Opus** | Max quality across the board (chosen) |
+| **devops-qa-engineer** | `…/devops-qa-engineer.md` → `model: opus` | **Opus** | Max quality across the board (chosen) |
 
 **Plan-before-execute:** every teammate is instructed to produce a short plan and
 wait for the lead's approval before implementing (read-only plan mode → lead
 approval). The Opus lead vets each plan.
 
-**Why not `opusplan` anywhere:** it only works for the main session, and even
-there it would switch the *lead* to Sonnet during execution — but we want the lead
-on Opus throughout for reviewing plans, so we set the lead to plain `opus`.
+**Why not `opusplan` anywhere:** it's a main-session-only mode that drops to a
+cheaper model for execution — but we want **Opus for both planning and
+execution**, so the lead is plain `opus` and every teammate is `opus` too.
+
+**All-Opus (chosen):** every role — lead and all four teammates — runs Opus for
+maximum quality. This is the most capable and most expensive setup. To trade some
+cost for speed later, drop specific teammates (e.g. `frontend-viz-engineer`,
+`devops-qa-engineer`) to `model: sonnet` in their agent file. The lead's model is
+just the session model in `.claude/settings.json` (`"model": "opus"`) — change it
+there (or with `/model`) if you ever want a different lead model.
 
 ---
 

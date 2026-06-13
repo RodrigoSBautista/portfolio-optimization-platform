@@ -16,7 +16,7 @@ role descriptions based on the real work breakdown, instead of a guessed split.
 - **Phase 2 optimization:** the responsible agent first runs **parallel deep research**, ranks techniques, and presents a summary for you to select before implementing.
 - **Phase 1 scope:** historical growth simulation **+** ongoing daily tracking.
 - **Stack:** Python, UV, matplotlib (Plotly when interactive), SQLite→PostgreSQL, Streamlit→React.
-- **Models:** team **lead + quant-ml-engineer on Opus**; backend, frontend, devops/QA on **Sonnet**; every teammate **plans before executing** (read-only plan mode → lead approval). See [AGENT_MODELS.md](AGENT_MODELS.md) for how model inheritance works.
+- **Models:** team **lead and all four teammates on Opus** (max quality); every teammate **plans before executing** (read-only plan mode → lead approval). See [AGENT_MODELS.md](AGENT_MODELS.md) for how model selection works.
 - **Version control:** git from day one with a **GitHub remote**; commit small and often; never commit secrets/`.db`/data caches (see `.gitignore`).
 - **Resumable workflow:** a standing convention in [../CLAUDE.md](../CLAUDE.md) / [WORKFLOW.md](WORKFLOW.md) — commit often + keep `docs/PROGRESS.md` current + small atomic tasks + the agent-team shared task list — so work survives token/usage interruptions.
 
@@ -29,7 +29,9 @@ role descriptions based on the real work breakdown, instead of a guessed split.
 ```text
 Produce a detailed, phased IMPLEMENTATION PLAN (no code yet) for an investment
 portfolio platform. Research where useful, then give me a plan I can execute
-phase by phase. Ask me clarifying questions before finalizing.
+phase by phase. Ask me only the clarifying questions that would materially change
+the plan. Where a stated constraint is suboptimal or conflicts with reality, say
+so and recommend the pragmatic alternative — don't silently change my constraints.
 
 GOAL
 A platform that (a) simulates how money would have grown if invested in chosen US
@@ -60,8 +62,8 @@ PHASES
   benchmark (e.g. SPY), with metrics (CAGR, volatility, Sharpe, max drawdown).
   Host on Streamlit.
 - Phase 2 (optimization): Add a portfolio optimization technique aimed at
-  long-term (3-5 yr), low-churn investing. FIRST use deep/parallel research to
-  survey candidate techniques, then present me a RANKED summary (pros/cons and
+  long-term (3-5 yr), low-churn investing. FIRST use the parallel-deep-research
+  skill to survey candidate techniques, then present me a RANKED summary (pros/cons and
   fit for long-term investing) so I can SELECT the approach before it is
   implemented. Always include an equal-weight baseline for comparison.
 - Final Phase (production): Replace Streamlit with a professional React frontend
@@ -102,6 +104,8 @@ DELIVER IN THE PLAN
    teams) use the shared task list to persist state across sessions. These are
    standing conventions already recorded in CLAUDE.md and docs/WORKFLOW.md — align
    the plan with them.
+8. A clear definition of done / acceptance criteria for each phase, so we know
+   when a phase is complete and demoable.
 
 Do not write application code — just the plan. Save the plan to docs/PLAN.md so
 the agent-creation step can read it.
@@ -185,21 +189,19 @@ FOR EACH AGENT FILE
 - A detailed system-prompt body: responsibilities, the files/layers it owns, the
   tech constraints above, its boundaries with the other agents, and its quality
   bar.
-- Set the frontmatter `model:` field EXACTLY as follows (do NOT use "opusplan" —
-  it is not valid for teammates):
-    quant-ml-engineer     -> opus     (heavy quantitative/ML reasoning)
-    backend-data-engineer -> sonnet
-    frontend-viz-engineer -> sonnet
-    devops-qa-engineer    -> sonnet
+- Set the frontmatter `model:` field to `opus` for ALL FOUR agents (do NOT use
+  "opusplan" — it is not valid for teammates).
 - In EVERY agent's system prompt, require it to ALWAYS produce a short plan/
   approach FIRST and wait for the lead's approval before implementing (work in
   read-only plan mode until approved). Plan first, then execute.
 - In EVERY agent's system prompt, also require it to follow the standing
-  conventions in CLAUDE.md and docs/WORKFLOW.md: read CLAUDE.md at the start of a
-  session; commit small and often with clear messages (never committing
-  secrets/.db/data caches); update docs/PROGRESS.md (Done/In-progress/Next) after
-  each meaningful unit; and keep work in small atomic tasks so a token/usage
-  interruption loses at most one task and can be resumed cleanly.
+  conventions in CLAUDE.md, docs/WORKFLOW.md, and docs/TOOLING.md: read CLAUDE.md
+  at the start of a session; commit small and often with clear messages (never
+  committing secrets/.db/data caches); update docs/PROGRESS.md (Done/In-progress/
+  Next) after each meaningful unit; keep work in small atomic tasks so a token/
+  usage interruption loses at most one task; and when reusable domain knowledge or
+  a workflow starts repeating, create a Skill for it rather than bloating prompts
+  or CLAUDE.md.
 
 Show me all four files (and any role changes you made based on the plan) for
 review before finalizing. Write no application code yet.

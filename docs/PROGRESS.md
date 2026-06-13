@@ -4,13 +4,13 @@
 > interruption. Keep this current — see [WORKFLOW.md](WORKFLOW.md). Update the
 > **Next step** line so a cold start knows exactly what to do next.
 
-_Last updated: 2026-06-10_
+_Last updated: 2026-06-13_
 
 ## Next step (start here on resume)
 
-- **Run Prompt 1** (from `docs/PROMPTS.md`) → produces `docs/PLAN.md`.
-- Then **Prompt 2** → creates the 4 agents in `.claude/agents/`.
-- Set up the **UV environment** (`uv init`) when Phase 1 build begins.
+- **Run Prompt 2** (from `docs/PROMPTS.md`) → creates the 4 agents in
+  `.claude/agents/` (it reads `docs/PLAN.md` first and may refine the roles).
+- Then begin **Phase 1, step 1** (env scaffold): `uv init` + deps when the build starts.
 - **Remote (SSH):** `git@github.com:RodrigoSBautista/portfolio-optimization-platform.git`
 
 ## In progress
@@ -19,6 +19,11 @@ _Last updated: 2026-06-10_
 
 ## Done
 
+- **Prompt 1 — executable plan written** to `docs/PLAN.md` (phased breakdown,
+  schema, per-phase DoD/verification). Confirmed this session: Phase 1 = plain
+  Streamlit + local SQLite (Supabase deferred to Production); persistence via
+  client-side file export/import + optional account save; optimization stays
+  unbiased/research-first (no pre-named techniques).
 - **Phase 0:** git repo initialized, SSH auth working, first commit pushed to
   `origin/main` (merged with the remote's LICENSE/README).
 - Project decision docs written: `docs/ARCHITECTURE.md`, `docs/PROMPTS.md`,

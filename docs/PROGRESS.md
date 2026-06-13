@@ -8,10 +8,11 @@ _Last updated: 2026-06-13_
 
 ## Next step (start here on resume)
 
-- Begin **Phase 1, step 2** (data layer, owner: backend-data): `data/provider.py`
-  (yfinance wrapper, dividend-adjusted / total-return prices) + `data/cache.py`
-  (parquet cache + "last refreshed"); handle delisted/non-overlapping/holidays;
-  unit-tested. See `docs/PLAN.md §4`.
+- Begin **Phase 1, step 4** (storage layer, owner: backend-data): SQLAlchemy models
+  (`storage/models.py` per `docs/PLAN.md §3`) + Alembic initial migration +
+  `storage/repository.py` (user_id-scoped) + `storage/portfolio_io.py` (JSON
+  export/import). Then **step 5** auth: hash passwords with **bcrypt directly**
+  (passlib dropped — see note in Done) + Streamlit login/signup.
 - **Remote (SSH):** `git@github.com:RodrigoSBautista/portfolio-optimization-platform.git`
 
 ## In progress
@@ -20,6 +21,16 @@ _Last updated: 2026-06-13_
 
 ## Done
 
+- **Phase 1 · step 3 — core layer** (merged): `core/simulation.py`
+  (`simulate_portfolio`: buy-and-hold + periodic rebalancing, lump-sum + recurring
+  DCA, look-ahead-safe; returns value/invested/twr_index using time-weighted return
+  so contributions aren't mistaken for gains) and `core/metrics.py` (CAGR, vol,
+  Sharpe, max drawdown, total return, summarize). 34 tests green.
+- **Phase 1 · step 2 — data layer** (merged): `data/provider.py` (yfinance
+  adjusted/total-return wrapper + delisted/non-overlap handling), `data/cache.py`
+  (parquet), `data/prices.py` (PriceService). Verified live + 10 offline tests.
+- **Dependency note:** dropped **passlib** (1.7.4 is broken with bcrypt 5.0 and is
+  unmaintained); auth will hash with the **`bcrypt`** library directly.
 - **Phase 1 · step 1 — env scaffold** (branch `feat/env-scaffold`): uv project
   (`pyproject.toml` requires-python >=3.11, `uv.lock` committed), runtime + dev deps,
   layered framework-free skeleton (`data/ core/ storage/ app/ jobs/ tests/`),

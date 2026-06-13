@@ -8,9 +8,11 @@ _Last updated: 2026-06-13_
 
 ## Next step (start here on resume)
 
-- **Run Prompt 2** (from `docs/PROMPTS.md`) → creates the 4 agents in
-  `.claude/agents/` (it reads `docs/PLAN.md` first and may refine the roles).
-- Then begin **Phase 1, step 1** (env scaffold): `uv init` + deps when the build starts.
+- Begin **Phase 1, step 1** (env scaffold, owner: devops-qa): `uv init` + deps
+  (pandas, numpy, yfinance, SQLAlchemy, alembic, passlib[bcrypt]/argon2, streamlit,
+  plotly, matplotlib, pytest, ruff), commit `uv.lock`, configure ruff/pytest, write
+  `.env.example`, README stub + disclaimer. Then Phase 1 step 2 (data layer). See
+  `docs/PLAN.md §4`.
 - **Remote (SSH):** `git@github.com:RodrigoSBautista/portfolio-optimization-platform.git`
 
 ## In progress
@@ -19,6 +21,13 @@ _Last updated: 2026-06-13_
 
 ## Done
 
+- **Prompt 2 — four reusable subagents created** in `.claude/agents/`:
+  `quant-ml-engineer`, `backend-data-engineer`, `frontend-viz-engineer`,
+  `devops-qa-engineer` (all `model: opus`, plan-before-execute, standing
+  conventions). Role refinements from `docs/PLAN.md`: quant-ml treats Monte
+  Carlo/PCA/forecasting as research-selected candidates (no pre-bias) and gets the
+  `Skill` tool for `parallel-deep-research`; auth, client-side save, and
+  refresh-vs-cron boundaries made explicit across agents.
 - **Prompt 1 — executable plan written** to `docs/PLAN.md` (phased breakdown,
   schema, per-phase DoD/verification). Confirmed this session: Phase 1 = plain
   Streamlit + local SQLite (Supabase deferred to Production); persistence via

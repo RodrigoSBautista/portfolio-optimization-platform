@@ -8,7 +8,7 @@ import pytest
 from sqlalchemy import create_engine
 
 from core.portfolio import Contribution, Holding, PortfolioSpec
-from storage.db import make_session_factory
+from storage.db import make_session_factory, session_scope
 from storage.models import Base
 from storage.portfolio_io import export_json, import_json, orm_to_spec
 from storage.repository import Repository
@@ -119,6 +119,38 @@ def test_upsert_valuation_rejects_foreign_portfolio(repo):
     p = repo.save_portfolio(alice.id, _spec())
     with pytest.raises(PermissionError):
         repo.upsert_valuation(bob.id, p.id, date(2024, 1, 2), 1.0)
+
+
+def test_upsert_preserves_benchmark_on_partial_update(repo):
+    user = repo.create_user("alice", "h")
+    p = repo.save_portfolio(user.id, _spec())
+    day = date(2024, 1, 2)
+    repo.upsert_valuation(user.id, p.id, day, 1000.0, 999.0)
+    repo.upsert_valuation(user.id, p.id, day, 1010.0)  # benchmark omitted
+
+    vals = repo.get_valuations(user.id, p.id)
+    assert vals[0].market_value == 1010.0
+    assert vals[0].benchmark_value == 999.0  # preserved, not wiped to NULL
+
+
+def test_orm_to_spec_safe_after_session_closes():
+    # Reproduces the detached-instance trap: fetch in a session_scope, then read
+    # holdings/contributions AFTER it closes. Eager loading must prevent a raise.
+    engine = create_engine("sqlite://", future=True)
+    Base.metadata.create_all(engine)
+    factory = make_session_factory(engine)
+
+    with session_scope(factory) as s:
+        user = Repository(s).create_user("alice", "h")
+        Repository(s).save_portfolio(user.id, _spec())
+        uid = user.id
+
+    with session_scope(factory) as s:
+        portfolio = Repository(s).list_portfolios(uid)[0]
+
+    spec = orm_to_spec(portfolio)  # session already closed
+    assert {h.symbol for h in spec.holdings} == {"AAPL", "MSFT"}
+    assert spec.contributions[0].amount == 1000.0
 
 
 # --- JSON export/import round-trip ----------------------------------------------

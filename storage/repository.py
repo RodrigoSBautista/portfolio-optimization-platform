@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import date
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from core.portfolio import PortfolioSpec
 from storage.models import Contribution, DailyValuation, Holding, Portfolio, User
@@ -36,19 +36,26 @@ class Repository:
 
     # --- portfolios (always scoped by user_id) ----------------------------------
 
+    # Eager-load child collections so callers can read holdings/contributions (and
+    # convert via orm_to_spec) after the session closes, without DetachedInstanceError.
+    _EAGER = (selectinload(Portfolio.holdings), selectinload(Portfolio.contributions))
+
     def list_portfolios(self, user_id: int) -> list[Portfolio]:
         return list(
             self.session.scalars(
-                select(Portfolio).where(Portfolio.user_id == user_id).order_by(Portfolio.name)
+                select(Portfolio)
+                .where(Portfolio.user_id == user_id)
+                .order_by(Portfolio.name)
+                .options(*self._EAGER)
             )
         )
 
     def get_portfolio(self, user_id: int, portfolio_id: int) -> Portfolio | None:
         """Return the portfolio only if it belongs to ``user_id`` (else None)."""
         return self.session.scalar(
-            select(Portfolio).where(
-                Portfolio.id == portfolio_id, Portfolio.user_id == user_id
-            )
+            select(Portfolio)
+            .where(Portfolio.id == portfolio_id, Portfolio.user_id == user_id)
+            .options(*self._EAGER)
         )
 
     def save_portfolio(
@@ -59,11 +66,11 @@ class Repository:
             portfolio = self.get_portfolio(user_id, portfolio_id)
             if portfolio is None:
                 raise PermissionError("portfolio not found for this user")
-            portfolio.holdings.clear()
-            portfolio.contributions.clear()
         else:
             portfolio = Portfolio(user_id=user_id)
             self.session.add(portfolio)
+        # Reassigning the collections below orphans any existing rows (delete-orphan
+        # cascade), so an explicit clear() is unnecessary.
 
         portfolio.name = spec.name
         portfolio.benchmark_symbol = spec.benchmark_symbol
@@ -116,7 +123,10 @@ class Repository:
         )
         if existing is not None:
             existing.market_value = market_value
-            existing.benchmark_value = benchmark_value
+            # None means "not provided" -> keep any previously stored benchmark
+            # rather than wiping it on a market-value-only refresh.
+            if benchmark_value is not None:
+                existing.benchmark_value = benchmark_value
             self.session.flush()
             return existing
 

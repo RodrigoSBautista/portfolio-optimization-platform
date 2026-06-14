@@ -10,7 +10,7 @@ import os
 from collections.abc import Iterator
 from contextlib import contextmanager
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -25,7 +25,18 @@ def create_db_engine(url: str | None = None) -> Engine:
     url = url or database_url()
     # check_same_thread=False lets Streamlit's threads share a SQLite connection.
     connect_args = {"check_same_thread": False} if url.startswith("sqlite") else {}
-    return create_engine(url, future=True, connect_args=connect_args)
+    engine = create_engine(url, future=True, connect_args=connect_args)
+
+    if url.startswith("sqlite"):
+        # SQLite ignores foreign keys unless this pragma is set per connection;
+        # turn it on so the DB enforces FK/cascade integrity, not just the ORM.
+        @event.listens_for(engine, "connect")
+        def _enable_sqlite_fk(dbapi_connection, _record):  # noqa: ANN001
+            cursor = dbapi_connection.cursor()
+            cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.close()
+
+    return engine
 
 
 def make_session_factory(engine: Engine) -> sessionmaker[Session]:

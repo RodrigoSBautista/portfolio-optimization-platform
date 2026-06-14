@@ -19,6 +19,8 @@ dependencies = [
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+# Alembic owns these templates/generated migrations; don't lint them.
+extend-exclude = ["migrations"]
 
 [tool.ruff.lint]
 # pycodestyle errors, pyflakes, isort, pyupgrade, flake8-bugbear

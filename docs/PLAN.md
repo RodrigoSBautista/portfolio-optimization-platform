@@ -236,6 +236,9 @@ and a working file-based restore.
 **Goal:** add a long-term (3–5 yr), low-churn optimization suggestion — with the
 technique chosen by evidence, not assumption.
 
+> **Detailed execution plan:** [PHASE2_PLAN.md](PHASE2_PLAN.md) (confirmed 2026-06-14:
+> both *allocate* and *select* modes; `parallel-deep-research` survey → user selects).
+
 **Ordered steps:**
 1. **Research** [quant-ml]: run the **`parallel-deep-research`** skill to survey
    candidate optimization techniques for long-term, low-turnover investing. Produce a

@@ -20,6 +20,7 @@ import pandas as pd
 from core.portfolio import PortfolioSpec
 from core.simulation import simulate_portfolio
 from data.prices import PriceService
+from data.provider import common_history
 from storage.db import create_db_engine, make_session_factory, session_scope
 from storage.portfolio_io import orm_to_spec
 from storage.repository import Repository
@@ -54,12 +55,17 @@ def refresh_portfolio(
     if frame.empty:
         return 0
 
-    port_prices = frame[[s for s in symbols if s in frame.columns]]
-    if benchmark not in frame.columns or port_prices.empty:
+    available = [s for s in symbols if s in frame.columns]
+    if benchmark not in frame.columns or not available:
         return 0
-    bench_prices = frame[[benchmark]]
 
-    valuations = build_valuations(spec, port_prices, bench_prices)
+    # Align holdings + benchmark to one common window so both simulations share the
+    # same dates and contribution schedule (apples-to-apples).
+    aligned = common_history(frame[[*available, benchmark]])
+    if aligned.empty:
+        return 0
+
+    valuations = build_valuations(spec, aligned[available], aligned[[benchmark]])
     for ts, row in valuations.iterrows():
         repo.upsert_valuation(
             user_id,

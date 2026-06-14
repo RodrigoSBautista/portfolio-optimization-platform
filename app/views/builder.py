@@ -31,7 +31,8 @@ def _apply_spec(spec: PortfolioSpec) -> None:
     st.session_state["b_name"] = spec.name
     st.session_state["b_bench"] = spec.benchmark_symbol
     rows = [{"symbol": h.symbol, "weight": h.weight} for h in spec.holdings]
-    st.session_state["b_holdings"] = pd.DataFrame(rows or _DEFAULT_HOLDINGS)
+    # Keep an empty editor (not the defaults) if the loaded spec has no holdings.
+    st.session_state["b_holdings"] = pd.DataFrame(rows, columns=["symbol", "weight"])
     kwargs = spec.simulation_kwargs()
     st.session_state["b_lump"] = float(kwargs["lump_sum"])
     st.session_state["b_rec"] = float(kwargs["recurring_amount"])

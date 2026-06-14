@@ -12,6 +12,7 @@ from app.services import fetch_prices
 from core.constants import NOT_FINANCIAL_ADVICE
 from core.metrics import summarize
 from core.simulation import simulate_portfolio
+from data.provider import common_history
 
 
 def _format_metrics(index: pd.Series) -> dict[str, str]:
@@ -60,14 +61,23 @@ def simulation_page() -> None:
         st.error("None of the holdings returned price data.")
         return
 
+    # Align holdings AND benchmark to one common window so the benchmark line uses an
+    # identical date range and contribution schedule (apples-to-apples comparison).
+    has_benchmark = benchmark in prices.columns
+    cols = available + ([benchmark] if has_benchmark else [])
+    aligned = common_history(prices[cols])
+    if aligned.empty:
+        st.error("No overlapping price history across these tickers and the benchmark.")
+        return
+
     weights = {s: w for s, w in spec.weights().items() if s in available}
     kwargs = spec.simulation_kwargs()
-    sim = simulate_portfolio(prices[available], weights, **kwargs)
+    sim = simulate_portfolio(aligned[available], weights, **kwargs)
 
     bench_value = None
     bench_index = None
-    if benchmark in prices.columns:
-        bench_sim = simulate_portfolio(prices[[benchmark]], {benchmark: 1.0}, **kwargs)
+    if has_benchmark:
+        bench_sim = simulate_portfolio(aligned[[benchmark]], {benchmark: 1.0}, **kwargs)
         bench_value = bench_sim["value"]
         bench_index = bench_sim["twr_index"]
     else:

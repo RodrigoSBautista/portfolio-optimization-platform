@@ -11,7 +11,6 @@ import streamlit as st
 from app.auth import current_user_id
 from app.services import get_price_service, get_session_factory
 from core.constants import NOT_FINANCIAL_ADVICE
-from core.metrics import cagr, max_drawdown, return_index
 from jobs.refresh import refresh_portfolio
 from storage.db import session_scope
 from storage.portfolio_io import orm_to_spec
@@ -75,10 +74,13 @@ def tracking_page() -> None:
     )
     st.plotly_chart(fig, use_container_width=True)
 
-    port_index = return_index(df["portfolio"])
     k1, k2, k3 = st.columns(3)
     k1.metric("Latest value", f"${df['portfolio'].iloc[-1]:,.0f}")
-    k2.metric("CAGR", f"{cagr(port_index) * 100:,.1f}%")
-    k3.metric("Max drawdown", f"{max_drawdown(port_index) * 100:,.1f}%")
+    if df["benchmark"].notna().any():
+        k2.metric("Benchmark value", f"${df['benchmark'].iloc[-1]:,.0f}")
+    k3.metric("Days tracked", f"{len(df)}")
 
-    st.caption(NOT_FINANCIAL_ADVICE)
+    st.caption(
+        "Tracked value includes your contributions, so it is not a pure return. "
+        "Use the Growth simulation page for return metrics. " + NOT_FINANCIAL_ADVICE
+    )

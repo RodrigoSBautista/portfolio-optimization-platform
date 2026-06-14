@@ -65,6 +65,33 @@ def test_dca_into_flat_prices_has_zero_twr_but_growing_value():
     np.testing.assert_allclose(out["twr_index"].tolist(), [1.0, 1.0, 1.0])
 
 
+def _contribution_count(freq: str) -> float:
+    # One business-day year, constant price, $1 per contribution -> invested == count.
+    idx = pd.bdate_range("2021-01-01", "2021-12-31")
+    prices = pd.DataFrame({"AAPL": 1.0}, index=idx)
+    out = simulate_portfolio(prices, {"AAPL": 1.0}, recurring_amount=1.0, recurring_freq=freq)
+    return out["invested"].iloc[-1]
+
+
+@pytest.mark.parametrize(
+    ("freq", "expected"),
+    [
+        ("monthly", 12),
+        ("every 2 months", 6),
+        ("quarterly", 4),
+        ("every 6 months", 2),
+        ("annually", 1),
+    ],
+)
+def test_recurring_frequency_contribution_counts(freq, expected):
+    assert _contribution_count(freq) == pytest.approx(expected)
+
+
+def test_weekly_frequency_is_about_one_per_week():
+    # ~52 weeks in a year (a small first-week boundary artifact is acceptable).
+    assert 52 <= _contribution_count("weekly") <= 53
+
+
 def test_dca_twr_ignores_contribution_inflows():
     # Price rises 10 -> 11 on day 2; a fresh contribution lands the same day.
     px = _prices({"AAPL": [10.0, 11.0]})

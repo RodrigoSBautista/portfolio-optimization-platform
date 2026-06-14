@@ -15,15 +15,19 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 import pandas as pd
+from pandas.tseries.frequencies import to_offset
 
-# Friendly frequency names -> pandas period aliases.
-_FREQ_ALIASES = {
+# Friendly frequency names -> pandas date_range offset (period-start steps).
+# Supports plain N-month cadences (e.g. every 2 / 6 months) that to_period can't.
+_FREQ_OFFSETS = {
     "daily": "D",
     "weekly": "W",
-    "monthly": "M",
-    "quarterly": "Q",
-    "annually": "Y",
-    "yearly": "Y",
+    "monthly": "MS",
+    "every 2 months": "2MS",
+    "quarterly": "QS",
+    "every 6 months": "6MS",
+    "annually": "YS",
+    "yearly": "YS",
 }
 
 
@@ -65,11 +69,19 @@ def _align(prices: pd.DataFrame, tickers: list[str]) -> pd.DataFrame:
     return px.loc[start:end].ffill()
 
 
-def _period_first_days(index: pd.DatetimeIndex, freq: str) -> set[pd.Timestamp]:
-    """First trading day within each period bucket (e.g. first market day each month)."""
-    alias = _FREQ_ALIASES.get(freq.lower(), freq)
-    by_period = pd.Series(index, index=index).groupby(index.to_period(alias)).min()
-    return set(pd.to_datetime(by_period.to_numpy()))
+def _contribution_dates(index: pd.DatetimeIndex, freq: str) -> set[pd.Timestamp]:
+    """Trading days on which a periodic action (contribution/rebalance) fires.
+
+    Builds period boundaries at the given cadence over the index span and snaps each
+    boundary **forward** to the first trading day on/after it (look-ahead-safe). The
+    range starts one step before the first day so the first period is included (the
+    first action lands on day one). Supports N-month cadences (every 2 / 6 months).
+    """
+    offset = _FREQ_OFFSETS.get(freq.lower(), freq)
+    start = index[0] - to_offset(offset)
+    boundaries = pd.date_range(start=start, end=index[-1], freq=offset)
+    positions = index.searchsorted(boundaries, side="left")
+    return {index[i] for i in positions if i < len(index)}
 
 
 def simulate_portfolio(
@@ -108,11 +120,11 @@ def simulate_portfolio(
 
     contrib_days: set[pd.Timestamp] = set()
     if recurring_amount > 0 and recurring_freq:
-        contrib_days = _period_first_days(dates, recurring_freq)
+        contrib_days = _contribution_dates(dates, recurring_freq)
 
     rebal_days: set[pd.Timestamp] = set()
     if rebalance:
-        rebal_days = _period_first_days(dates, rebalance)
+        rebal_days = _contribution_dates(dates, rebalance)
         rebal_days.discard(dates[0])  # nothing to rebalance on day one
 
     shares = pd.Series(0.0, index=tickers)

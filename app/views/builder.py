@@ -56,7 +56,8 @@ def _apply_spec(spec: PortfolioSpec) -> None:
     kwargs = spec.simulation_kwargs()
     st.session_state["b_lump"] = float(kwargs["lump_sum"])
     st.session_state["b_rec"] = float(kwargs["recurring_amount"])
-    st.session_state["b_freq"] = kwargs["recurring_freq"] or "none"
+    freq = kwargs["recurring_freq"] or "none"
+    st.session_state["b_freq"] = freq if freq in _FREQS else "none"
 
 
 def _current_benchmark() -> str:
@@ -68,9 +69,13 @@ def _current_benchmark() -> str:
 def _build_spec(holdings_df: pd.DataFrame, mode: str) -> PortfolioSpec:
     pairs: list[tuple[str, float]] = []
     for _, row in holdings_df.iterrows():
-        symbol = str(row.get("symbol") or "").strip().upper()
+        symbol_raw = row.get("symbol")
         value = row.get("value")
-        if symbol and value is not None and float(value) > 0:
+        # Skip blank rows; an empty data_editor cell comes back as NaN.
+        if symbol_raw is None or pd.isna(symbol_raw) or value is None or pd.isna(value):
+            continue
+        symbol = str(symbol_raw).strip().upper()
+        if symbol and float(value) > 0:
             pairs.append((symbol, float(value)))
 
     if mode == "Dollar amount":

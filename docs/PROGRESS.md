@@ -8,7 +8,7 @@ _Last updated: 2026-06-13_
 
 ## Next step (start here on resume)
 
-- **Phase 1 is complete and demoable.** Begin **Phase 2 (optimization)**: the
+- **Phase 1.5 (MVP refinements) is complete.** Begin **Phase 2 (optimization)**: the
   `quant-ml-engineer` runs the **`parallel-deep-research`** skill to survey + rank
   long-term, low-churn optimization techniques, presents a ranked summary, and the
   **user selects** before any implementation (no bias). Always include the
@@ -29,6 +29,17 @@ _Last updated: 2026-06-13_
 
 ## Done
 
+- **✅ Phase 1.5 COMPLETE — MVP refinements** (4 branches, each tested + merged):
+  (A) curated **ticker universe** `data/tickers.csv` (S&P 500 + ETFs) + loader;
+  (B) builder **ticker suggestions** (searchable multiselect) + **weight/$-amount
+  toggle** + benchmark picker (`weights_from_amounts`); (C) **more recurring
+  cadences** (added every 2 / 6 months, ordered shortest→longest via a DateOffset
+  generator that supports N-month steps); (D) **Compare 2–3 saved portfolios** —
+  shared `app/sim_runner.py` (also refactored the Simulation page onto it), a compare
+  view with side-by-side KPIs + one chart + metrics table, aligned to a single global
+  window for fairness. 80 tests green; verified live (builder + compare screenshots
+  in `docs/screenshots/`). Decisions: curated-list search now / live autocomplete in
+  React; persistence still stores weights (amount mode converts).
 - **🎉 Phase 1 COMPLETE — local Streamlit + SQLite app is functional & demoable**
   (merged, code-reviewed). Multi-user **auth** (`storage/security.py` bcrypt,
   `storage/auth_service.py`, `app/auth.py` + session gating); **Streamlit UI**

@@ -69,7 +69,13 @@ Growth simulation — a 2018 lump sum in AAPL/MSFT/GOOGL vs the SPY benchmark
 
 ![Growth simulation](docs/screenshots/growth-simulation.png)
 
-Portfolio builder (holdings, contributions, save/export):
+Compare 2–3 saved portfolios side by side (KPIs, one chart, a shared window for a
+fair comparison):
+
+![Compare portfolios](docs/screenshots/compare.png)
+
+Portfolio builder — searchable ticker suggestions, weight or $-amount entry,
+benchmark picker, and a flexible contribution plan:
 
 ![Portfolio builder](docs/screenshots/builder.png)
 

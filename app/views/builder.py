@@ -24,7 +24,15 @@ from storage.db import session_scope
 from storage.portfolio_io import export_json, import_json
 from storage.repository import Repository
 
-_FREQS = ["none", "monthly", "weekly", "quarterly", "annually"]
+_FREQS = [
+    "none",
+    "weekly",
+    "monthly",
+    "every 2 months",
+    "quarterly",
+    "every 6 months",
+    "annually",
+]
 _OTHER = "Other…"
 _DEFAULT_HOLDINGS = pd.DataFrame(
     {"symbol": ["AAPL", "MSFT", "GOOGL"], "value": [0.4, 0.4, 0.2]}

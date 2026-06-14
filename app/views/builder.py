@@ -1,4 +1,8 @@
-"""Builder page: define holdings + contributions, save to account, export/import."""
+"""Builder page: choose holdings (by weight or $), save to account, export/import.
+
+Tickers and the benchmark are picked from a searchable curated universe
+(`data/tickers.py`), with a free-text fallback for anything not on the list.
+"""
 
 from __future__ import annotations
 
@@ -7,49 +11,84 @@ import streamlit as st
 
 from app.auth import current_user_id
 from app.services import get_session_factory
-from core.portfolio import LUMP_SUM, RECURRING, Contribution, Holding, PortfolioSpec
+from core.portfolio import (
+    LUMP_SUM,
+    RECURRING,
+    Contribution,
+    Holding,
+    PortfolioSpec,
+    weights_from_amounts,
+)
+from data.tickers import COMMON_BENCHMARKS, label, symbols
 from storage.db import session_scope
 from storage.portfolio_io import export_json, import_json
 from storage.repository import Repository
 
 _FREQS = ["none", "monthly", "weekly", "quarterly", "annually"]
+_OTHER = "Other…"
 _DEFAULT_HOLDINGS = pd.DataFrame(
-    {"symbol": ["AAPL", "MSFT", "GOOGL"], "weight": [0.4, 0.4, 0.2]}
+    {"symbol": ["AAPL", "MSFT", "GOOGL"], "value": [0.4, 0.4, 0.2]}
 )
 
 
 def _init_state() -> None:
     st.session_state.setdefault("b_name", "My Portfolio")
-    st.session_state.setdefault("b_bench", "SPY")
+    st.session_state.setdefault("b_bench_choice", "SPY")
+    st.session_state.setdefault("b_bench_other", "SPY")
+    st.session_state.setdefault("b_mode", "Weight")
     st.session_state.setdefault("b_lump", 1000.0)
     st.session_state.setdefault("b_rec", 0.0)
     st.session_state.setdefault("b_freq", "none")
-    st.session_state.setdefault("b_holdings", _DEFAULT_HOLDINGS.copy())
+    if "b_holdings" not in st.session_state:
+        st.session_state["b_holdings"] = _DEFAULT_HOLDINGS.copy()
 
 
 def _apply_spec(spec: PortfolioSpec) -> None:
     st.session_state["b_name"] = spec.name
-    st.session_state["b_bench"] = spec.benchmark_symbol
-    rows = [{"symbol": h.symbol, "weight": h.weight} for h in spec.holdings]
-    # Keep an empty editor (not the defaults) if the loaded spec has no holdings.
-    st.session_state["b_holdings"] = pd.DataFrame(rows, columns=["symbol", "weight"])
+    if spec.benchmark_symbol in COMMON_BENCHMARKS:
+        st.session_state["b_bench_choice"] = spec.benchmark_symbol
+    else:
+        st.session_state["b_bench_choice"] = _OTHER
+        st.session_state["b_bench_other"] = spec.benchmark_symbol
+    st.session_state["b_mode"] = "Weight"  # holdings persist as weights
+    rows = [{"symbol": h.symbol, "value": h.weight} for h in spec.holdings]
+    st.session_state["b_holdings"] = pd.DataFrame(rows, columns=["symbol", "value"])
     kwargs = spec.simulation_kwargs()
     st.session_state["b_lump"] = float(kwargs["lump_sum"])
     st.session_state["b_rec"] = float(kwargs["recurring_amount"])
-    st.session_state["b_freq"] = kwargs["recurring_freq"] or "none"
+    freq = kwargs["recurring_freq"] or "none"
+    st.session_state["b_freq"] = freq if freq in _FREQS else "none"
 
 
-def _build_spec(holdings_df: pd.DataFrame) -> PortfolioSpec:
-    holdings: list[Holding] = []
+def _current_benchmark() -> str:
+    if st.session_state["b_bench_choice"] == _OTHER:
+        return st.session_state["b_bench_other"].strip().upper() or "SPY"
+    return st.session_state["b_bench_choice"]
+
+
+def _build_spec(holdings_df: pd.DataFrame, mode: str) -> PortfolioSpec:
+    pairs: list[tuple[str, float]] = []
     for _, row in holdings_df.iterrows():
-        symbol = str(row.get("symbol") or "").strip().upper()
-        weight = row.get("weight")
-        if symbol and weight is not None and float(weight) > 0:
-            holdings.append(Holding(symbol, float(weight)))
+        symbol_raw = row.get("symbol")
+        value = row.get("value")
+        # Skip blank rows; an empty data_editor cell comes back as NaN.
+        if symbol_raw is None or pd.isna(symbol_raw) or value is None or pd.isna(value):
+            continue
+        symbol = str(symbol_raw).strip().upper()
+        if symbol and float(value) > 0:
+            pairs.append((symbol, float(value)))
+
+    if mode == "Dollar amount":
+        weights, total = weights_from_amounts(dict(pairs))
+        holdings = [Holding(s, weights[s]) for s in weights]
+        lump_sum = total
+    else:
+        holdings = [Holding(s, v) for s, v in pairs]  # raw weights, normalized at sim time
+        lump_sum = float(st.session_state["b_lump"])
 
     contributions: list[Contribution] = []
-    if st.session_state["b_lump"] > 0:
-        contributions.append(Contribution(LUMP_SUM, float(st.session_state["b_lump"])))
+    if lump_sum > 0:
+        contributions.append(Contribution(LUMP_SUM, lump_sum))
     if st.session_state["b_rec"] > 0 and st.session_state["b_freq"] != "none":
         contributions.append(
             Contribution(
@@ -60,7 +99,7 @@ def _build_spec(holdings_df: pd.DataFrame) -> PortfolioSpec:
     return PortfolioSpec(
         name=st.session_state["b_name"].strip() or "My Portfolio",
         holdings=holdings,
-        benchmark_symbol=(st.session_state["b_bench"].strip().upper() or "SPY"),
+        benchmark_symbol=_current_benchmark(),
         contributions=contributions,
     )
 
@@ -68,7 +107,7 @@ def _build_spec(holdings_df: pd.DataFrame) -> PortfolioSpec:
 def builder_page() -> None:
     _init_state()
     st.header("🧱 Build a portfolio")
-    st.write("Pick US stocks/ETFs and target weights, set a contribution plan, then save it.")
+    st.write("Pick US stocks/ETFs and a contribution plan, then save it.")
 
     uploaded = st.file_uploader("Restore a portfolio from a file (.json)", type="json")
     if uploaded is not None and st.button("Load this file"):
@@ -80,37 +119,65 @@ def builder_page() -> None:
             st.error("That doesn't look like a valid portfolio file.")
 
     st.text_input("Portfolio name", key="b_name")
-    st.text_input("Benchmark symbol", key="b_bench", help="e.g. SPY")
+
+    # Benchmark: searchable curated list + free-text fallback.
+    st.selectbox("Benchmark", COMMON_BENCHMARKS + [_OTHER], key="b_bench_choice")
+    if st.session_state["b_bench_choice"] == _OTHER:
+        st.text_input("Benchmark ticker", key="b_bench_other")
 
     st.subheader("Holdings")
+    picks = st.multiselect(
+        "Add tickers (type to search)", options=symbols(), format_func=label, key="b_pick"
+    )
+    if st.button("➕ Add selected") and picks:
+        existing = {str(s).upper() for s in st.session_state["b_holdings"]["symbol"]}
+        new = [{"symbol": s, "value": 0.0} for s in picks if s.upper() not in existing]
+        if new:
+            st.session_state["b_holdings"] = pd.concat(
+                [st.session_state["b_holdings"], pd.DataFrame(new)], ignore_index=True
+            )
+            st.rerun()
+
+    mode = st.radio("Enter holdings by", ["Weight", "Dollar amount"], key="b_mode", horizontal=True)
+    value_label = "Amount ($)" if mode == "Dollar amount" else "Weight"
+    step = 100.0 if mode == "Dollar amount" else 0.05
     holdings_df = st.data_editor(
         st.session_state["b_holdings"],
         num_rows="dynamic",
         use_container_width=True,
         column_config={
             "symbol": st.column_config.TextColumn("Ticker"),
-            "weight": st.column_config.NumberColumn("Weight", min_value=0.0, step=0.05),
+            "value": st.column_config.NumberColumn(value_label, min_value=0.0, step=step),
         },
-        key="b_holdings_editor",
     )
+    st.session_state["b_holdings"] = holdings_df  # persist edits
 
     st.subheader("Contributions")
-    col1, col2, col3 = st.columns(3)
-    col1.number_input("Lump sum ($)", min_value=0.0, step=100.0, key="b_lump")
-    col2.number_input("Recurring amount ($)", min_value=0.0, step=50.0, key="b_rec")
-    col3.selectbox("Recurring frequency", _FREQS, key="b_freq")
+    if mode == "Weight":
+        col1, col2, col3 = st.columns(3)
+        col1.number_input("Lump sum ($)", min_value=0.0, step=100.0, key="b_lump")
+        col2.number_input("Recurring amount ($)", min_value=0.0, step=50.0, key="b_rec")
+        col3.selectbox("Recurring frequency", _FREQS, key="b_freq")
+    else:
+        col2, col3 = st.columns(2)
+        col2.number_input("Recurring amount ($)", min_value=0.0, step=50.0, key="b_rec")
+        col3.selectbox("Recurring frequency", _FREQS, key="b_freq")
 
-    spec = _build_spec(holdings_df)
+    spec = _build_spec(holdings_df, mode)
     st.session_state["current_spec"] = spec  # hand off to the Simulation page
 
-    total_weight = sum(h.weight for h in spec.holdings)
     if spec.holdings:
-        st.caption(
-            f"{len(spec.holdings)} holding(s); weights sum to {total_weight:.2f} "
-            "(rescaled to 100% at simulation time)."
-        )
+        if mode == "Dollar amount":
+            total = sum(c.amount for c in spec.contributions if c.kind == LUMP_SUM)
+            implied = ", ".join(f"{h.symbol} {h.weight * 100:.0f}%" for h in spec.holdings)
+            st.caption(f"Total initial investment: ${total:,.0f} · implied weights: {implied}")
+        else:
+            st.caption(
+                f"{len(spec.holdings)} holding(s); weights sum to "
+                f"{sum(h.weight for h in spec.holdings):.2f} (rescaled to 100% at simulation time)."
+            )
     else:
-        st.warning("Add at least one holding with a positive weight.")
+        st.warning("Add at least one holding with a positive value.")
 
     st.divider()
     left, right = st.columns(2)

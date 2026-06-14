@@ -48,3 +48,33 @@ def growth_chart(
         margin={"l": 10, "r": 10, "t": 60, "b": 10},
     )
     return fig
+
+
+def comparison_chart(
+    value_by_name: dict[str, pd.Series],
+    benchmark_value: pd.Series | None,
+    *,
+    currency: str = "USD",
+) -> go.Figure:
+    """One figure with a value line per portfolio + the (shared) benchmark."""
+    fig = go.Figure()
+    for name, series in value_by_name.items():
+        fig.add_trace(go.Scatter(x=series.index, y=series, name=name, line={"width": 2.5}))
+    if benchmark_value is not None and not benchmark_value.empty:
+        fig.add_trace(
+            go.Scatter(
+                x=benchmark_value.index,
+                y=benchmark_value,
+                name="Benchmark",
+                line={"width": 2, "dash": "dash", "color": "gray"},
+            )
+        )
+    fig.update_layout(
+        title="Portfolio comparison",
+        xaxis_title="Date",
+        yaxis_title=f"Value ({currency})",
+        hovermode="x unified",
+        legend={"orientation": "h", "yanchor": "bottom", "y": 1.02, "x": 0},
+        margin={"l": 10, "r": 10, "t": 60, "b": 10},
+    )
+    return fig

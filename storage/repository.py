@@ -140,6 +140,15 @@ class Repository:
         self.session.flush()
         return valuation
 
+    def all_portfolio_refs(self) -> list[tuple[int, int]]:
+        """(user_id, portfolio_id) for every portfolio — for the scheduled refresh job.
+
+        Not user-facing: the daily job legitimately spans all users. User-facing reads
+        still go through the user_id-scoped methods above.
+        """
+        rows = self.session.execute(select(Portfolio.user_id, Portfolio.id)).all()
+        return [(int(user_id), int(pid)) for user_id, pid in rows]
+
     def get_valuations(self, user_id: int, portfolio_id: int) -> list[DailyValuation]:
         if self.get_portfolio(user_id, portfolio_id) is None:
             return []

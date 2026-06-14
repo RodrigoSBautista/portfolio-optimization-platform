@@ -44,6 +44,16 @@ class PortfolioSpec:
         """Raw target weights keyed by upper-cased symbol (unnormalized)."""
         return {h.symbol.upper(): h.weight for h in self.holdings}
 
+    def simulation_kwargs(self) -> dict:
+        """Translate the contribution plan into ``simulate_portfolio`` arguments."""
+        lump = sum(c.amount for c in self.contributions if c.kind == LUMP_SUM)
+        recurring = next((c for c in self.contributions if c.kind == RECURRING), None)
+        return {
+            "lump_sum": float(lump),
+            "recurring_amount": recurring.amount if recurring else 0.0,
+            "recurring_freq": recurring.frequency if recurring else None,
+        }
+
     def to_dict(self) -> dict:
         return {
             "version": SPEC_VERSION,

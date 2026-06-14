@@ -41,15 +41,29 @@ uv sync
 # Copy the env template and adjust if needed (Phase 1 defaults to local SQLite)
 cp .env.example .env        # PowerShell: Copy-Item .env.example .env
 
+# Apply database migrations (creates portfolio.db locally)
+uv run alembic upgrade head
+
 # Run the test suite and linter
 uv run pytest
 uv run ruff check
 
-# Launch the app (once app/ pages exist)
-uv run streamlit run app/Home.py
+# Launch the app
+uv run streamlit run app/streamlit_app.py
+```
+
+Then sign up, build a portfolio on **Build a portfolio**, and run **Growth
+simulation** to see how it would have grown vs the benchmark. Export a portfolio to
+a JSON file to keep it on your computer, or save it to your account.
+
+The daily tracking refresh runs locally:
+
+```bash
+uv run python -m jobs.refresh   # idempotent; upserts daily valuations
 ```
 
 ## Status
 
-Phase 1 (local Streamlit + SQLite) is in progress — see
-[docs/PROGRESS.md](docs/PROGRESS.md) for the current state and next step.
+Phase 1 (local Streamlit + SQLite) is functional: multi-user login, portfolio
+builder with file export/import + account save, dividend-adjusted growth simulation
+vs a benchmark, and a tracking dashboard. See [docs/PROGRESS.md](docs/PROGRESS.md).

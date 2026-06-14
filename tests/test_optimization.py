@@ -119,3 +119,26 @@ def test_allocate_and_select_dispatch(prices):
         assert _sums_to_one(w) and _long_only(w)
     for method in opt.SELECTION_METHODS:
         assert len(opt.select(method, prices, 2)) == 2
+
+
+# --- robustness on messy real-world inputs --------------------------------------
+
+def test_methods_survive_nan_gaps_and_flat_assets(prices):
+    p = prices.copy()
+    p.iloc[5, 0] = np.nan  # internal NaN gap in A (yfinance-style hole)
+    p["E"] = 100.0  # flat / zero-variance asset (halted or bad data)
+    for method in opt.ALLOCATION_METHODS:
+        w = opt.allocate(method, p)
+        assert _sums_to_one(w) and _long_only(w)
+        assert not any(np.isnan(v) for v in w.values())  # never garbage weights
+    for method in opt.SELECTION_METHODS:
+        assert len(opt.select(method, p, 2)) >= 1
+
+
+def test_non_overlapping_histories_are_aligned(prices):
+    p = prices.copy()
+    p.iloc[:100, 1] = np.nan  # B "lists" ~100 days late
+    for method in ("Risk parity", "Minimum-variance", "Hierarchical Risk Parity"):
+        w = opt.allocate(method, p)
+        assert _sums_to_one(w)
+        assert not any(np.isnan(v) for v in w.values())

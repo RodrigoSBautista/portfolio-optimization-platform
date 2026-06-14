@@ -32,8 +32,19 @@ from sklearn.covariance import LedoitWolf
 
 
 def _returns(prices: pd.DataFrame) -> pd.DataFrame:
-    """Daily simple returns from a price frame (drops the first/empty rows)."""
-    return prices.sort_index().pct_change().dropna(how="all").dropna(axis=1, how="all")
+    """Clean daily simple returns: aligned to the common window, no NaN, no flat assets.
+
+    Drops all-NaN tickers, forward-fills internal gaps (look-ahead-safe), trims leading
+    rows so the matrix starts where every remaining ticker has data, and drops
+    zero-variance (flat/bad-data) columns — which otherwise break covariance/correlation
+    and 1/vol math. So covariance, correlation, and Ledoit-Wolf never see NaN/inf.
+    """
+    clean = prices.sort_index().dropna(axis=1, how="all").ffill()
+    returns = clean.pct_change().dropna(how="any")
+    if returns.empty:
+        return returns
+    nonzero = returns.columns[returns.std() > 0]
+    return returns[nonzero]
 
 
 def _apply_cap(weights: pd.Series, cap: float) -> pd.Series:
@@ -92,6 +103,8 @@ def risk_parity(prices: pd.DataFrame, *, max_weight: float | None = None) -> dic
     returns = _returns(prices)
     cols = list(returns.columns)
     n = len(cols)
+    if n == 0:
+        return equal_weight(list(prices.columns))
     if n == 1:
         return {str(cols[0]).upper(): 1.0}
     cov = returns.cov().values
@@ -115,7 +128,9 @@ def risk_parity(prices: pd.DataFrame, *, max_weight: float | None = None) -> dic
         constraints=[{"type": "eq", "fun": lambda w: w.sum() - 1.0}],
         options={"maxiter": 1000, "ftol": 1e-12},
     )
-    return _finalize(pd.Series(result.x, index=cols), max_weight)
+    # Fall back to the inverse-vol start if the solver didn't converge.
+    weights = result.x if result.success else w0
+    return _finalize(pd.Series(weights, index=cols), max_weight)
 
 
 def min_variance(
@@ -125,27 +140,34 @@ def min_variance(
     returns = _returns(prices)
     cols = list(returns.columns)
     n = len(cols)
+    if n == 0:
+        return equal_weight(list(prices.columns))
     if n == 1:
         return {str(cols[0]).upper(): 1.0}
     cov = LedoitWolf().fit(returns.values).covariance_ if shrinkage else returns.cov().values
 
     upper = max_weight if max_weight else 1.0
+    equal = np.full(n, 1.0 / n)
     result = minimize(
         lambda w: float(w @ cov @ w),
-        np.full(n, 1.0 / n),
+        equal,
         jac=lambda w: 2.0 * cov @ w,
         method="SLSQP",
         bounds=[(0.0, upper)] * n,
         constraints=[{"type": "eq", "fun": lambda w: w.sum() - 1.0}],
         options={"maxiter": 1000, "ftol": 1e-12},
     )
-    return _finalize(pd.Series(result.x, index=cols), max_weight)
+    # Fall back to equal weight if the solver didn't converge.
+    weights = result.x if result.success else equal
+    return _finalize(pd.Series(weights, index=cols), max_weight)
 
 
 def hrp(prices: pd.DataFrame, *, max_weight: float | None = None) -> dict[str, float]:
     """Hierarchical Risk Parity: cluster by correlation, split risk down the tree."""
     returns = _returns(prices)
     cols = list(returns.columns)
+    if len(cols) == 0:
+        return equal_weight(list(prices.columns))
     if len(cols) == 1:
         return {str(cols[0]).upper(): 1.0}
     cov = returns.cov()

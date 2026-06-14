@@ -8,14 +8,19 @@ _Last updated: 2026-06-13_
 
 ## Next step (start here on resume)
 
-- Begin **Phase 1, step 5** (auth): `app/auth.py` — hash/verify passwords with the
-  **`bcrypt`** library directly (cap password length to bcrypt's 72-byte limit),
-  signup/login, store current `user_id` in `st.session_state`, gate pages behind
-  login. Use `Repository.create_user` / `get_user_by_username` (check existence
-  before create to give a clean "username taken" error). Then **step 6** Streamlit
-  pages (builder, save/restore, growth simulation, tracking dashboard).
+- **Phase 1 is complete and demoable.** Begin **Phase 2 (optimization)**: the
+  `quant-ml-engineer` runs the **`parallel-deep-research`** skill to survey + rank
+  long-term, low-churn optimization techniques, presents a ranked summary, and the
+  **user selects** before any implementation (no bias). Always include the
+  equal-weight baseline. See `docs/PLAN.md §4 Phase 2`.
+- **Known Phase 1 follow-ups (non-blocking):** tracking metrics are value-based
+  (honest caption added); a correct TWR-based tracking metric would need storing the
+  `twr_index` in `daily_valuations` (schema migration). Auth signup has a benign
+  TOCTOU on the username-unique check (DB constraint still protects integrity).
 - **Workflow:** solo build + an independent `/code-review` on each feature branch
   before merge (chosen 2026-06-13). Full agent team reserved for Phase 2 research.
+- **Run the app:** `uv run streamlit run app/streamlit_app.py` (after
+  `uv run alembic upgrade head`). Refresh job: `uv run python -m jobs.refresh`.
 - **Remote (SSH):** `git@github.com:RodrigoSBautista/portfolio-optimization-platform.git`
 
 ## In progress
@@ -24,6 +29,17 @@ _Last updated: 2026-06-13_
 
 ## Done
 
+- **🎉 Phase 1 COMPLETE — local Streamlit + SQLite app is functional & demoable**
+  (merged, code-reviewed). Multi-user **auth** (`storage/security.py` bcrypt,
+  `storage/auth_service.py`, `app/auth.py` + session gating); **Streamlit UI**
+  (`app/streamlit_app.py` + `app/views/{builder,simulation,tracking}.py`,
+  `app/charts.py` Plotly): build/save/export/import portfolios, dividend-adjusted
+  **growth simulation** vs benchmark (TWR metrics), and a **tracking dashboard**;
+  idempotent **refresh job** (`jobs/refresh.py`, also the tracking "Refresh now").
+  Verified live via Playwright screenshots (signup → builder → simulation: a 2018
+  $1k in AAPL/MSFT/GOOGL → ~$6.2k vs SPY). Independent `/code-review` caught and
+  fixed a benchmark-window misalignment + contribution-inflated tracking metric.
+  **61 tests green**, ruff clean.
 - **Phase 1 · step 4 — storage layer** (merged, code-reviewed): `storage/models.py`
   (users, portfolios, holdings, contributions, daily_valuations; portable types;
   UNIQUE(portfolio_id, as_of_date)), `storage/db.py` (DB-agnostic engine; SQLite FK

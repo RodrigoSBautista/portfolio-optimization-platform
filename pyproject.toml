@@ -26,6 +26,10 @@ extend-exclude = ["migrations"]
 # pycodestyle errors, pyflakes, isort, pyupgrade, flake8-bugbear
 select = ["E", "F", "I", "UP", "B"]
 
+[tool.ruff.lint.per-file-ignores]
+# The entry script must bootstrap sys.path before importing app packages.
+"app/streamlit_app.py" = ["E402"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"

@@ -62,6 +62,17 @@ The daily tracking refresh runs locally:
 uv run python -m jobs.refresh   # idempotent; upserts daily valuations
 ```
 
+## Screenshots
+
+Growth simulation — a 2018 lump sum in AAPL/MSFT/GOOGL vs the SPY benchmark
+(dividend-adjusted, look-ahead-safe):
+
+![Growth simulation](docs/screenshots/growth-simulation.png)
+
+Portfolio builder (holdings, contributions, save/export):
+
+![Portfolio builder](docs/screenshots/builder.png)
+
 ## Status
 
 Phase 1 (local Streamlit + SQLite) is functional: multi-user login, portfolio

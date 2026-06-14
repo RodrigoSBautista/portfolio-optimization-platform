@@ -80,6 +80,18 @@ class PortfolioSpec:
         )
 
 
+def weights_from_amounts(amounts: Mapping[str, float]) -> tuple[dict[str, float], float]:
+    """Convert per-ticker dollar amounts into normalized weights + the total.
+
+    Ignores non-positive amounts. Returns ``({}, 0.0)`` when nothing positive is given.
+    """
+    cleaned = {k.upper(): float(v) for k, v in amounts.items() if float(v) > 0}
+    total = sum(cleaned.values())
+    if total <= 0:
+        return {}, 0.0
+    return {k: v / total for k, v in cleaned.items()}, total
+
+
 def _contribution_to_dict(c: Contribution) -> dict:
     out = asdict(c)
     out["start_date"] = c.start_date.isoformat() if c.start_date else None

@@ -8,11 +8,11 @@ _Last updated: 2026-06-13_
 
 ## Next step (start here on resume)
 
-- **Phase 1.5 (MVP refinements) is complete.** Begin **Phase 2 (optimization)**: the
-  `quant-ml-engineer` runs the **`parallel-deep-research`** skill to survey + rank
-  long-term, low-churn optimization techniques, presents a ranked summary, and the
-  **user selects** before any implementation (no bias). Always include the
-  equal-weight baseline. See `docs/PLAN.md §4 Phase 2`.
+- **Phase 2 (optimization) is complete.** Next is the **Final Phase (production)**:
+  FastAPI backend over the unchanged `core/`, real auth, SQLite→**Supabase Postgres**
+  (Alembic), **GitHub Actions cron** for daily refresh, a **React** frontend, and
+  cloud deploy. See `docs/PLAN.md` Final Phase. (Optional follow-ups first: a
+  forecasting/Monte-Carlo feature, or more polish.)
 - **Known Phase 1 follow-ups (non-blocking):** tracking metrics are value-based
   (honest caption added); a correct TWR-based tracking metric would need storing the
   `twr_index` in `daily_valuations` (schema migration). Auth signup has a benign
@@ -29,6 +29,18 @@ _Last updated: 2026-06-13_
 
 ## Done
 
+- **✅ Phase 2 COMPLETE — portfolio optimization (research-first, unbiased)**.
+  Stage 2A: ranked survey `docs/OPTIMIZATION_RESEARCH.md` (built-in web research, as
+  the paid parallel-cli was unavailable). Gate: user selected 4 allocators + 2
+  selectors. Stage 2B: `core/optimization.py` (framework-free) — equal-weight baseline
+  + **risk parity (ERC)**, **inverse-volatility**, **min-variance + Ledoit-Wolf
+  shrinkage**, **HRP**, plus **low-volatility** and **correlation-clustering**
+  selection; long-only/sum-to-1/optional cap; hardened against NaN/flat/non-overlapping
+  inputs after an independent review (adds scipy + scikit-learn). Stage 2C:
+  `app/views/optimize.py` — Optimize page (Allocate / Select modes) showing suggested
+  vs **equal-weight baseline** vs benchmark (reuses `app/sim_runner`); "Use these
+  weights" / "Save as portfolio". 93 tests green; verified live
+  (`docs/screenshots/optimize.png`).
 - **✅ Phase 1.5 COMPLETE — MVP refinements** (4 branches, each tested + merged):
   (A) curated **ticker universe** `data/tickers.csv` (S&P 500 + ETFs) + loader;
   (B) builder **ticker suggestions** (searchable multiselect) + **weight/$-amount

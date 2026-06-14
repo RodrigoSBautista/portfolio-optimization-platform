@@ -78,3 +78,23 @@ def comparison_chart(
         margin={"l": 10, "r": 10, "t": 60, "b": 10},
     )
     return fig
+
+
+def weights_bar(
+    weights_by_strategy: dict[str, dict[str, float]], *, title: str = "Suggested weights"
+) -> go.Figure:
+    """Grouped bar chart of weights (%) per ticker, one series per strategy."""
+    tickers = sorted({t for w in weights_by_strategy.values() for t in w})
+    fig = go.Figure()
+    for name, weights in weights_by_strategy.items():
+        fig.add_trace(
+            go.Bar(x=tickers, y=[weights.get(t, 0.0) * 100 for t in tickers], name=name)
+        )
+    fig.update_layout(
+        barmode="group",
+        title=title,
+        yaxis_title="Weight (%)",
+        legend={"orientation": "h", "yanchor": "bottom", "y": 1.02, "x": 0},
+        margin={"l": 10, "r": 10, "t": 60, "b": 10},
+    )
+    return fig

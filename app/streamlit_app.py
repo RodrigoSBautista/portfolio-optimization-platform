@@ -17,6 +17,7 @@ import streamlit as st
 from app.auth import current_username, is_logged_in, login_page, logout
 from app.views.builder import builder_page
 from app.views.compare import compare_page
+from app.views.optimize import optimize_page
 from app.views.simulation import simulation_page
 from app.views.tracking import tracking_page
 from core.constants import NOT_FINANCIAL_ADVICE
@@ -30,6 +31,7 @@ if not is_logged_in():
 PAGES = {
     "🧱 Build a portfolio": builder_page,
     "📈 Growth simulation": simulation_page,
+    "🧮 Optimize": optimize_page,
     "⚖️ Compare portfolios": compare_page,
     "📊 Tracking dashboard": tracking_page,
 }

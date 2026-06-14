@@ -8,11 +8,14 @@ _Last updated: 2026-06-13_
 
 ## Next step (start here on resume)
 
-- Begin **Phase 1, step 4** (storage layer, owner: backend-data): SQLAlchemy models
-  (`storage/models.py` per `docs/PLAN.md §3`) + Alembic initial migration +
-  `storage/repository.py` (user_id-scoped) + `storage/portfolio_io.py` (JSON
-  export/import). Then **step 5** auth: hash passwords with **bcrypt directly**
-  (passlib dropped — see note in Done) + Streamlit login/signup.
+- Begin **Phase 1, step 5** (auth): `app/auth.py` — hash/verify passwords with the
+  **`bcrypt`** library directly (cap password length to bcrypt's 72-byte limit),
+  signup/login, store current `user_id` in `st.session_state`, gate pages behind
+  login. Use `Repository.create_user` / `get_user_by_username` (check existence
+  before create to give a clean "username taken" error). Then **step 6** Streamlit
+  pages (builder, save/restore, growth simulation, tracking dashboard).
+- **Workflow:** solo build + an independent `/code-review` on each feature branch
+  before merge (chosen 2026-06-13). Full agent team reserved for Phase 2 research.
 - **Remote (SSH):** `git@github.com:RodrigoSBautista/portfolio-optimization-platform.git`
 
 ## In progress
@@ -21,6 +24,15 @@ _Last updated: 2026-06-13_
 
 ## Done
 
+- **Phase 1 · step 4 — storage layer** (merged, code-reviewed): `storage/models.py`
+  (users, portfolios, holdings, contributions, daily_valuations; portable types;
+  UNIQUE(portfolio_id, as_of_date)), `storage/db.py` (DB-agnostic engine; SQLite FK
+  pragma), `storage/repository.py` (**all reads/writes scoped by user_id**; eager
+  loading; idempotent benchmark-preserving upsert), `storage/portfolio_io.py` (JSON
+  export/import + ORM↔spec), `core/portfolio.py` (PortfolioSpec value objects).
+  Alembic initial migration verified (downgrade/upgrade round-trip). An independent
+  `/code-review` caught a benchmark-overwrite bug + a detached-instance trap; both
+  fixed. 47 tests green.
 - **Phase 1 · step 3 — core layer** (merged): `core/simulation.py`
   (`simulate_portfolio`: buy-and-hold + periodic rebalancing, lump-sum + recurring
   DCA, look-ahead-safe; returns value/invested/twr_index using time-weighted return

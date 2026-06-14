@@ -69,6 +69,11 @@ Growth simulation — a 2018 lump sum in AAPL/MSFT/GOOGL vs the SPY benchmark
 
 ![Growth simulation](docs/screenshots/growth-simulation.png)
 
+Optimize — suggested allocation (risk parity / HRP / inverse-vol / min-variance)
+always shown next to the equal-weight baseline, with a growth comparison:
+
+![Optimize](docs/screenshots/optimize.png)
+
 Compare 2–3 saved portfolios side by side (KPIs, one chart, a shared window for a
 fair comparison):
 

@@ -78,10 +78,10 @@ def test_optimize_select_then_allocate(client):
     headers = auth_headers(client, "optsel")
     body = {
         "mode": "select",
-        "method": "Low volatility",
+        "method": "Inverse-volatility",  # allocation method
         "candidates": ["AAPL", "MSFT", "GOOG", "AMZN", "NVDA", "META"],
         "k": 3,
-        "selection_method": "Inverse-volatility",
+        "selection_method": "Low volatility",  # selection method
         "lookback_years": 1,
         "benchmark": "SPY",
     }
@@ -91,3 +91,14 @@ def test_optimize_select_then_allocate(client):
     assert len(data["selected"]) == 3
     assert pytest.approx(sum(data["suggested"].values()), abs=1e-6) == 1.0
     assert pytest.approx(sum(data["baseline"].values()), abs=1e-6) == 1.0
+
+
+def test_optimize_unknown_method_is_400(client):
+    headers = auth_headers(client, "optbad")
+    body = {
+        "mode": "allocate",
+        "method": "Definitely Not A Method",
+        "tickers": ["AAPL", "MSFT"],
+        "lookback_years": 1,
+    }
+    assert client.post("/api/optimize", json=body, headers=headers).status_code == 400

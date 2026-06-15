@@ -21,7 +21,13 @@ from api.schemas import (
     SimulateResponse,
 )
 from app.sim_runner import SimError, format_metrics, run_simulation
-from core.optimization import allocate, equal_weight, select
+from core.optimization import (
+    ALLOCATION_METHODS,
+    SELECTION_METHODS,
+    allocate,
+    equal_weight,
+    select,
+)
 from core.portfolio import Holding, PortfolioSpec
 from data.prices import PriceService
 from data.provider import common_history
@@ -128,24 +134,38 @@ def optimize(
         )
     candidate_prices = aligned[available]
 
-    # Selection step (optional): narrow the universe before allocating.
+    # `method` is always the allocation method; `selection_method` (select mode) picks
+    # which tickers to keep. Validate names up front so a typo is a 400, not a 500.
+    if body.method not in ALLOCATION_METHODS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unknown allocation method '{body.method}'",
+        )
     if body.mode == "select":
+        sel_method = body.selection_method or "Low volatility"
+        if sel_method not in SELECTION_METHODS:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Unknown selection method '{sel_method}'",
+            )
         k = body.k or len(available)
-        selected = select(body.method, candidate_prices, k)
-        selected = [s for s in selected if s in candidate_prices.columns]
-        alloc_method = body.selection_method or "Equal weight"
+        selected = [s for s in select(sel_method, candidate_prices, k) if s in available]
     else:
         selected = available
-        alloc_method = body.method
 
     alloc_prices = candidate_prices[selected]
-    suggested = allocate(alloc_method, alloc_prices, max_weight=body.max_weight)
+    suggested = allocate(body.method, alloc_prices, max_weight=body.max_weight)
     baseline = equal_weight(selected)
 
     sug_spec = _spec_from_weights("Suggested", suggested, benchmark)
     base_spec = _spec_from_weights("Equal weight", baseline, benchmark)
-    sug_res = run_simulation(sug_spec, aligned, benchmark)
-    base_res = run_simulation(base_spec, aligned, benchmark)
+    try:
+        sug_res = run_simulation(sug_spec, aligned, benchmark)
+        base_res = run_simulation(base_spec, aligned, benchmark)
+    except SimError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
 
     sug_val = sug_res.sim["value"]
     base_val = base_res.sim["value"]
@@ -156,7 +176,7 @@ def optimize(
             ComparisonPoint(
                 date=ts.date(),
                 suggested=float(sug_val.loc[ts]),
-                equal_weight=float(base_val.loc[ts]) if ts in base_val.index else float("nan"),
+                equal_weight=(float(base_val.loc[ts]) if ts in base_val.index else None),
                 benchmark=(
                     float(bench_val.loc[ts])
                     if bench_val is not None and ts in bench_val.index
@@ -166,7 +186,7 @@ def optimize(
         )
 
     metrics: dict[str, dict[str, str]] = {
-        alloc_method: format_metrics(sug_res.sim["twr_index"]),
+        body.method: format_metrics(sug_res.sim["twr_index"]),
         "Equal weight": format_metrics(base_res.sim["twr_index"]),
     }
     if sug_res.has_benchmark and sug_res.benchmark_index is not None:

@@ -106,11 +106,11 @@ class SimulateResponse(BaseModel):
 
 class OptimizeRequest(BaseModel):
     mode: str  # "allocate" | "select"
-    method: str
-    tickers: list[str] = Field(default_factory=list)
-    candidates: list[str] = Field(default_factory=list)
-    k: int | None = None
-    selection_method: str | None = None
+    method: str  # ALWAYS the allocation method (e.g. "Risk parity")
+    tickers: list[str] = Field(default_factory=list)  # allocate mode
+    candidates: list[str] = Field(default_factory=list)  # select mode
+    k: int | None = None  # select mode: number of holdings to keep
+    selection_method: str | None = None  # select mode: the selection method
     lookback_years: int = 5
     max_weight: float | None = None
     benchmark: str = "SPY"
@@ -119,7 +119,7 @@ class OptimizeRequest(BaseModel):
 class ComparisonPoint(BaseModel):
     date: date
     suggested: float
-    equal_weight: float
+    equal_weight: float | None = None  # null when a date is missing (not NaN)
     benchmark: float | None = None
 
 

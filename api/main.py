@@ -30,7 +30,8 @@ app = FastAPI(title="Portfolio Platform API", version="0.1.0", lifespan=lifespan
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
-    allow_credentials=True,
+    # Auth is via Authorization: Bearer headers, not cookies — no credentials needed.
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )

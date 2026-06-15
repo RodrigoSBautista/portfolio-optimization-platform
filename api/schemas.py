@@ -1,0 +1,131 @@
+"""Pydantic v2 DTOs for the API + DTO<->PortfolioSpec conversion.
+
+The portfolio DTO mirrors ``core.portfolio.PortfolioSpec`` exactly; conversion reuses
+the canonical ``to_dict``/``from_dict`` so the serialized shape stays single-sourced.
+"""
+
+from __future__ import annotations
+
+from datetime import date
+
+from pydantic import BaseModel, Field
+
+from core.portfolio import PortfolioSpec
+
+# --- auth -----------------------------------------------------------------------
+
+
+class Credentials(BaseModel):
+    username: str
+    password: str
+
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
+
+class UserOut(BaseModel):
+    id: int
+    username: str
+
+
+# --- tickers --------------------------------------------------------------------
+
+
+class TickerOut(BaseModel):
+    symbol: str
+    name: str
+
+
+# --- portfolio spec -------------------------------------------------------------
+
+
+class HoldingDTO(BaseModel):
+    symbol: str
+    weight: float
+
+
+class ContributionDTO(BaseModel):
+    kind: str  # "lump_sum" | "recurring"
+    amount: float
+    frequency: str | None = None
+    start_date: date | None = None
+    end_date: date | None = None
+
+
+class PortfolioSpecDTO(BaseModel):
+    name: str
+    benchmark_symbol: str = "SPY"
+    base_currency: str = "USD"
+    holdings: list[HoldingDTO] = Field(default_factory=list)
+    contributions: list[ContributionDTO] = Field(default_factory=list)
+
+    def to_spec(self) -> PortfolioSpec:
+        return PortfolioSpec.from_dict(self.model_dump(mode="json"))
+
+    @classmethod
+    def from_spec(cls, spec: PortfolioSpec) -> PortfolioSpecDTO:
+        data = spec.to_dict()
+        data.pop("version", None)
+        return cls.model_validate(data)
+
+
+class PortfolioOut(PortfolioSpecDTO):
+    id: int
+
+
+# --- simulate -------------------------------------------------------------------
+
+
+class SimulateRequest(BaseModel):
+    spec: PortfolioSpecDTO
+    start: date
+    benchmark: str | None = None
+
+
+class SeriesPoint(BaseModel):
+    date: date
+    value: float
+    invested: float
+    benchmark: float | None = None
+
+
+class SimulateResponse(BaseModel):
+    series: list[SeriesPoint]
+    metrics: dict[str, dict[str, str]]
+    final_value: float
+    invested: float
+    gain_pct: float
+    dropped: list[str]
+    benchmark: str
+
+
+# --- optimize -------------------------------------------------------------------
+
+
+class OptimizeRequest(BaseModel):
+    mode: str  # "allocate" | "select"
+    method: str
+    tickers: list[str] = Field(default_factory=list)
+    candidates: list[str] = Field(default_factory=list)
+    k: int | None = None
+    selection_method: str | None = None
+    lookback_years: int = 5
+    max_weight: float | None = None
+    benchmark: str = "SPY"
+
+
+class ComparisonPoint(BaseModel):
+    date: date
+    suggested: float
+    equal_weight: float
+    benchmark: float | None = None
+
+
+class OptimizeResponse(BaseModel):
+    selected: list[str]
+    suggested: dict[str, float]
+    baseline: dict[str, float]
+    comparison_series: list[ComparisonPoint]
+    metrics: dict[str, dict[str, str]]

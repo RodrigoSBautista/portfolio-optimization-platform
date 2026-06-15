@@ -6,11 +6,13 @@ requires-python = ">=3.11"
 dependencies = [
     "alembic>=1.18.4",
     "bcrypt>=5.0.0",
+    "fastapi>=0.137.1",
     "matplotlib>=3.11.0",
     "numpy>=2.4.6",
     "pandas>=3.0.3",
     "plotly>=6.8.0",
     "pyarrow>=24.0.0",
+    "pyjwt>=2.13.0",
     "scikit-learn>=1.9.0",
     "scipy>=1.17.1",
     "sqlalchemy>=2.0",
@@ -31,6 +33,8 @@ select = ["E", "F", "I", "UP", "B"]
 [tool.ruff.lint.per-file-ignores]
 # The entry script must bootstrap sys.path before importing app packages.
 "app/streamlit_app.py" = ["E402"]
+# FastAPI's dependency-injection idiom is `Depends(...)` in argument defaults.
+"api/**/*.py" = ["B008"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -38,6 +42,7 @@ addopts = "-q"
 
 [dependency-groups]
 dev = [
+    "httpx>=0.28.1",
     "pytest>=9.1.0",
     "ruff>=0.15.17",
 ]

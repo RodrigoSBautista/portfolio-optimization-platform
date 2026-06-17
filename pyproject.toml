@@ -43,6 +43,7 @@ addopts = "-q"
 [dependency-groups]
 dev = [
     "httpx>=0.28.1",
+    "playwright>=1.60.0",
     "pytest>=9.1.0",
     "ruff>=0.15.17",
 ]

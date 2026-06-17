@@ -15,6 +15,18 @@ Python 3.11+ · [uv](https://docs.astral.sh/uv/) (env + packaging) · pandas/num
 yfinance (prices) · SQLAlchemy + Alembic (SQLite now → PostgreSQL later) ·
 Streamlit (UI now → FastAPI + React later) · matplotlib + Plotly.
 
+## Two front ends
+
+The platform has **two interchangeable UIs over the same `core/`** — isolated by
+directory, both running independently:
+
+- **Streamlit** (`app/`) — the original, fastest to iterate.
+- **Web UI** (`api/` FastAPI + `web/` React) — a Google-Finance-style SPA with
+  light/dark themes and green/red charts. See [docs/WEB_UI.md](docs/WEB_UI.md).
+
+![Web dashboard — light](docs/screenshots/web-dashboard-light.png)
+![Web dashboard — dark](docs/screenshots/web-dashboard-dark.png)
+
 ## Project layout
 
 ```
@@ -22,6 +34,8 @@ data/     market-data fetching + parquet cache (yfinance wrapper)
 core/     PURE finance/ML logic — no UI/DB imports (simulation, metrics, optimization)
 storage/  SQLAlchemy models + user_id-scoped repository
 app/      Streamlit UI (thin: calls core/ and storage/)
+api/      FastAPI REST backend over core/ (JWT auth) — for the React web UI
+web/      React + Vite + TS + Tailwind SPA (Google-Finance style)
 jobs/     scheduled daily refresh (local now; CI cron later)
 tests/    pytest
 docs/     ARCHITECTURE, PLAN, PROGRESS, and design notes

@@ -8,11 +8,14 @@ _Last updated: 2026-06-13_
 
 ## Next step (start here on resume)
 
-- **Phase 2 (optimization) is complete.** Next is the **Final Phase (production)**:
-  FastAPI backend over the unchanged `core/`, real auth, SQLite→**Supabase Postgres**
-  (Alembic), **GitHub Actions cron** for daily refresh, a **React** frontend, and
-  cloud deploy. See `docs/PLAN.md` Final Phase. (Optional follow-ups first: a
-  forecasting/Monte-Carlo feature, or more polish.)
+- **Web UI (FastAPI + React) MVP is complete** (built alongside Streamlit; SQLite).
+  Remaining for the **Final Phase (production)**: SQLite→**Supabase Postgres**
+  (Alembic — only `DATABASE_URL` changes), **GitHub Actions cron** for daily refresh,
+  auth hardening (require `AUTH_SECRET`; refresh tokens), **Compare + Tracking views
+  in React** (currently web-MVP has dashboard/simulation/optimize), and **cloud
+  deploy**. See `docs/PLAN.md` Final Phase + [docs/WEB_UI.md](WEB_UI.md).
+- **Web-UI known follow-ups (non-blocking):** sidebar does one `/api/simulate` per row
+  (N+1 live fetches — fine for a few portfolios; batch later); JWT in `localStorage`.
 - **Known Phase 1 follow-ups (non-blocking):** tracking metrics are value-based
   (honest caption added); a correct TWR-based tracking metric would need storing the
   `twr_index` in `daily_valuations` (schema migration). Auth signup has a benign
@@ -29,6 +32,16 @@ _Last updated: 2026-06-13_
 
 ## Done
 
+- **✅ Web UI (FastAPI + React) MVP — Google-Finance style** (built by the agent team,
+  reviewed, merged). Isolated by directory (Streamlit `app/` untouched — verified):
+  **`api/`** = FastAPI over the unchanged `core/`/`data/`/`storage/` with JWT auth +
+  per-user isolation (backend-data-engineer; 16 API tests; an independent review fixed
+  a prod-secret footgun + NaN-JSON + optimize 4xx mapping). **`web/`** = React + Vite +
+  TS + Tailwind SPA (frontend-viz-engineer): **light/dark themes** (toggle, persisted),
+  green/red **area growth chart**, sidebar sparklines, KPI grid (all %s time-weighted
+  for consistency after review), metrics-vs-benchmark table, new-portfolio + optimize
+  views. 110 Python tests green; `npm run build`+lint clean; verified live via
+  Playwright (`docs/screenshots/web-*.png`). See [docs/WEB_UI.md](WEB_UI.md).
 - **✅ Phase 2 COMPLETE — portfolio optimization (research-first, unbiased)**.
   Stage 2A: ranked survey `docs/OPTIMIZATION_RESEARCH.md` (built-in web research, as
   the paid parallel-cli was unavailable). Gate: user selected 4 allocators + 2

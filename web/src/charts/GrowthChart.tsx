@@ -15,15 +15,16 @@ import { ChartTooltip } from "./ChartTooltip";
 
 interface Props {
   series: SeriesPoint[];
-  gainPct: number;
+  // Sign of the return that drives the trend color (>= 0 green, < 0 red).
+  trendSign: number;
   benchmarkLabel: string;
 }
 
-// Large area growth chart: GREEN when gain_pct >= 0, RED when < 0 (gradient fill
-// + matching stroke). The benchmark is a thin neutral line.
-export function GrowthChart({ series, gainPct, benchmarkLabel }: Props) {
+// Large area growth chart: GREEN when the trend is >= 0, RED when < 0 (gradient
+// fill + matching stroke). The benchmark is a thin neutral line.
+export function GrowthChart({ series, trendSign, benchmarkLabel }: Props) {
   const ct = useChartTheme();
-  const color = trendColor(gainPct);
+  const color = trendColor(trendSign);
   const hasBenchmark = series.some((p) => p.benchmark != null);
   const gradId = "growthFill";
 

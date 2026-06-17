@@ -6,7 +6,11 @@ import { GrowthChart } from "../charts/GrowthChart";
 import { KpiCard } from "../components/KpiCard";
 import { MetricsTable } from "../components/MetricsTable";
 import { RANGES, startForRange, type RangeKey } from "../lib/dates";
-import { formatCurrency, formatPct, formatSignedCurrency } from "../lib/format";
+import {
+  formatCurrency,
+  formatSignedCurrency,
+  metricSign,
+} from "../lib/format";
 
 interface Props {
   portfolio: Portfolio;
@@ -70,7 +74,9 @@ export function Dashboard({ portfolio }: Props) {
           <div className="rounded-lg border border-edge bg-surface p-3 dark:border-edge-dark dark:bg-surface-dark">
             <GrowthChart
               series={data.series}
-              gainPct={data.gain_pct}
+              // Trend color follows the time-weighted return so the chart agrees
+              // with the "Total return" KPI and the metrics table.
+              trendSign={metricSign(data.metrics[portfolio.name]?.["Total return"])}
               benchmarkLabel={data.benchmark}
             />
           </div>
@@ -81,18 +87,31 @@ export function Dashboard({ portfolio }: Props) {
             </div>
           )}
 
+          {/*
+            Dollar tiles are cost-basis (money in vs money out). The percentage
+            tile uses the TIME-WEIGHTED "Total return" from metrics so the KPI %,
+            the metrics table, and the chart trend all agree (vs the money-weighted
+            final/invested ratio, which would contradict them).
+          */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             <KpiCard label="Final value" value={formatCurrency(data.final_value)} />
-            <KpiCard label="Total invested" value={formatCurrency(data.invested)} />
             <KpiCard
-              label="Gain ($)"
+              label="Total invested (cost basis)"
+              value={formatCurrency(data.invested)}
+            />
+            <KpiCard
+              label="Net gain ($, value − invested)"
               value={formatSignedCurrency(data.final_value - data.invested)}
               tone={data.final_value - data.invested >= 0 ? "up" : "down"}
             />
             <KpiCard
-              label="Gain (%)"
-              value={formatPct(data.gain_pct)}
-              tone={data.gain_pct >= 0 ? "up" : "down"}
+              label="Total return (%, time-weighted)"
+              value={data.metrics[portfolio.name]?.["Total return"] ?? "—"}
+              tone={
+                metricSign(data.metrics[portfolio.name]?.["Total return"]) >= 0
+                  ? "up"
+                  : "down"
+              }
             />
             {renderMetricKpis(data.metrics, portfolio.name)}
           </div>

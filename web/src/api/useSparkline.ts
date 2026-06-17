@@ -11,8 +11,15 @@ export interface SparkData {
 // Derives a ~1Y sparkline + % change (last vs first of the value series) for a
 // spec, via /api/simulate. Used by the sidebar rows.
 export function useSparkline(spec: PortfolioSpec, id: string | number) {
+  // Hash the parts that affect the simulation so the cache refreshes after an
+  // edit to holdings/contributions/benchmark (not just when the id changes).
+  const specHash = JSON.stringify({
+    holdings: spec.holdings,
+    contributions: spec.contributions,
+    benchmark: spec.benchmark_symbol,
+  });
   return useQuery({
-    queryKey: ["sparkline", id],
+    queryKey: ["sparkline", id, specHash],
     queryFn: async (): Promise<SparkData> => {
       const res = await simulate({ spec, start: oneYearAgo() });
       const values = res.series.map((p) => p.value);

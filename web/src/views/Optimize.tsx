@@ -38,6 +38,15 @@ export function Optimize({ onSaveAsPortfolio }: Props) {
     setTickers(tickers.filter((t) => t !== symbol));
   }
 
+  // How many holdings the suggestion will actually allocate across: all tickers in
+  // allocate mode, else the top-k (capped at the candidate count) in select mode.
+  const allocatedCount =
+    mode === "select" ? Math.min(k, tickers.length) : tickers.length;
+  // A cap below 100/count is infeasible (weights can't sum to 1), so clamp the
+  // slider's floor to ceil(100 / count).
+  const minMaxWeight = allocatedCount > 0 ? Math.ceil(100 / allocatedCount) : 5;
+  const effectiveMaxWeight = Math.max(maxWeight, minMaxWeight);
+
   async function run() {
     setError(null);
     if (tickers.length < 2) {
@@ -49,7 +58,7 @@ export function Optimize({ onSaveAsPortfolio }: Props) {
       method,
       benchmark: benchmark.toUpperCase(),
       lookback_years: lookback,
-      max_weight: maxWeight / 100,
+      max_weight: effectiveMaxWeight / 100,
       ...(mode === "allocate"
         ? { tickers }
         : { candidates: tickers, k, selection_method: selectionMethod }),
@@ -160,17 +169,23 @@ export function Optimize({ onSaveAsPortfolio }: Props) {
 
           <label className="block">
             <span className="mb-1 block text-xs text-content-muted dark:text-content-dark-muted">
-              Max weight: {maxWeight}%
+              Max weight: {effectiveMaxWeight}%
             </span>
             <input
               type="range"
-              min={5}
+              min={minMaxWeight}
               max={100}
               step={5}
-              value={maxWeight}
+              value={effectiveMaxWeight}
               onChange={(e) => setMaxWeight(Number(e.target.value))}
               className="w-full accent-brand"
             />
+            {maxWeight < minMaxWeight && allocatedCount > 0 && (
+              <span className="mt-1 block text-xs text-content-muted dark:text-content-dark-muted">
+                Raised to {minMaxWeight}% — a lower cap can't fill{" "}
+                {allocatedCount} holdings.
+              </span>
+            )}
           </label>
 
           <label className="block">

@@ -29,7 +29,7 @@ export function NewPortfolio({
   const create = useCreatePortfolio();
   const [name, setName] = useState(initialName ?? "");
   const [benchmark, setBenchmark] = useState(initialBenchmark ?? "SPY");
-  const [mode, setMode] = useState<WeightMode>(initialWeights ? "weight" : "weight");
+  const [mode, setMode] = useState<WeightMode>("weight");
   const [rows, setRows] = useState<Row[]>(
     initialWeights
       ? Object.entries(initialWeights).map(([symbol, w]) => ({ symbol, amount: w }))
@@ -45,7 +45,7 @@ export function NewPortfolio({
 
   function addRow(symbol: string) {
     if (rows.some((r) => r.symbol === symbol)) return;
-    setRows([...rows, { symbol, amount: mode === "weight" ? 0 : 0 }]);
+    setRows([...rows, { symbol, amount: 0 }]);
   }
   function removeRow(symbol: string) {
     setRows(rows.filter((r) => r.symbol !== symbol));
@@ -54,9 +54,10 @@ export function NewPortfolio({
     setRows(rows.map((r) => (r.symbol === symbol ? { ...r, amount: value } : r)));
   }
 
+  const total = rows.reduce((s, r) => s + (r.amount || 0), 0);
+
   // Derive normalized weights (sum to 1) from rows under the active mode.
   function computeWeights(): Record<string, number> | null {
-    const total = rows.reduce((s, r) => s + (r.amount || 0), 0);
     if (rows.length === 0 || total <= 0) return null;
     const w: Record<string, number> = {};
     for (const r of rows) w[r.symbol] = (r.amount || 0) / total;
@@ -70,8 +71,12 @@ export function NewPortfolio({
     if (!name.trim()) return setError("Give the portfolio a name.");
     if (!weights) return setError("Add at least one holding with a positive value.");
 
+    // In $-amount mode the lump sum IS the sum of the per-ticker dollars (weights
+    // still derive from the same amounts); the separate lump-sum field is ignored.
+    const lump = mode === "amount" ? total : lumpSum;
+
     const contributions: Contribution[] = [];
-    if (lumpSum > 0) contributions.push({ kind: "lump_sum", amount: lumpSum });
+    if (lump > 0) contributions.push({ kind: "lump_sum", amount: lump });
     if (recurring > 0)
       contributions.push({ kind: "recurring", amount: recurring, frequency });
 
@@ -90,8 +95,6 @@ export function NewPortfolio({
       setError(apiErrorMessage(err, "Could not save the portfolio."));
     }
   }
-
-  const total = rows.reduce((s, r) => s + (r.amount || 0), 0);
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-4">
@@ -182,14 +185,20 @@ export function NewPortfolio({
       <fieldset className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <label className="block">
           <span className="mb-1 block text-xs text-content-muted dark:text-content-dark-muted">
-            Lump sum ($)
+            {mode === "amount" ? "Lump sum ($, = total below)" : "Lump sum ($)"}
           </span>
           <input
             type="number"
             min={0}
-            value={lumpSum}
+            value={mode === "amount" ? total : lumpSum}
             onChange={(e) => setLumpSum(Number(e.target.value))}
-            className="w-full rounded-md border border-edge bg-surface px-3 py-2 text-sm outline-none focus:border-brand dark:border-edge-dark dark:bg-surface-dark-alt"
+            disabled={mode === "amount"}
+            title={
+              mode === "amount"
+                ? "In dollar-amount mode the lump sum is the sum of the per-ticker amounts."
+                : undefined
+            }
+            className="w-full rounded-md border border-edge bg-surface px-3 py-2 text-sm outline-none focus:border-brand disabled:opacity-50 dark:border-edge-dark dark:bg-surface-dark-alt"
           />
         </label>
         <label className="block">

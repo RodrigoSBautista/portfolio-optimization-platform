@@ -35,6 +35,9 @@ class StaggeredProvider:
 
     LATE = {"LATE"}
     LATE_OFFSET = 40
+    # ``MISSING`` tickers return no column at all — the delisted/invalid case
+    # (yfinance yields nothing), which PriceService silently omits.
+    MISSING = {"DELISTED"}
 
     def fetch_adjusted_close(
         self, tickers: list[str], start: date, end: date | None = None
@@ -43,6 +46,8 @@ class StaggeredProvider:
         data: dict[str, pd.Series] = {}
         for t in tickers:
             sym = t.upper()
+            if sym in self.MISSING:
+                continue
             seed = sum(ord(c) for c in sym)
             rng = np.random.default_rng(seed)
             drift = 0.0002 + (seed % 7) * 0.00005
@@ -232,10 +237,75 @@ def test_valuations_shape_and_refresh_idempotent(client):
 def test_refresh_defaults_start_when_omitted(client):
     headers = auth_headers(client, "track_default")
     pid = _make_portfolio(client, headers, "Defaulted", [{"symbol": "AAPL", "weight": 1.0}])
-    # Omit start entirely -> defaults to Jan 1 three years ago; still writes rows.
+    # Omit start entirely -> defaults to Jan 1 three years ago; the fake provider yields a
+    # full window from that default, so rows are actually written and persisted.
     resp = client.post(f"/api/portfolios/{pid}/refresh", json={}, headers=headers)
     assert resp.status_code == 200, resp.text
-    assert resp.json()["written"] >= 0
+    written = resp.json()["written"]
+    assert written > 0
+    stored = client.get(f"/api/portfolios/{pid}/valuations", headers=headers).json()["valuations"]
+    assert len(stored) == written
+
+
+def test_compare_rejects_duplicate_ids(client):
+    headers = auth_headers(client, "cmp_dupe")
+    a = _make_portfolio(client, headers, "Dupe", [{"symbol": "AAPL", "weight": 1.0}])
+    # [a, a] passes the 2-3 length check but is not a real comparison -> 422.
+    body = {"portfolio_ids": [a, a], "start": "2021-01-04", "benchmark": "SPY"}
+    assert client.post("/api/compare", json=body, headers=headers).status_code == 422
+
+
+def test_refresh_survives_priceless_holding():
+    """A saved 60/40 portfolio where one holding is delisted (no price data).
+
+    ``available`` is non-empty (AAPL survives), so the pre-simulation guards don't fire.
+    ``build_valuations`` must weight only the surviving ticker (regression: it used to
+    pass the unfiltered spec weights and 500 on the missing column). The refresh succeeds
+    and writes rows for AAPL alone.
+    """
+    client, teardown = build_client_with(StaggeredProvider())
+    try:
+        headers = auth_headers(client, "priceless")
+        pid = _make_portfolio(
+            client,
+            headers,
+            "Partly delisted",
+            [{"symbol": "AAPL", "weight": 0.6}, {"symbol": "DELISTED", "weight": 0.4}],
+        )
+        resp = client.post(
+            f"/api/portfolios/{pid}/refresh", json={"start": "2021-01-04"}, headers=headers
+        )
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["written"] > 0
+        stored = client.get(
+            f"/api/portfolios/{pid}/valuations", headers=headers
+        ).json()["valuations"]
+        assert len(stored) == resp.json()["written"]
+        assert stored[0]["market_value"] > 0
+    finally:
+        teardown()
+
+
+def test_compare_reports_dropped_holdings():
+    """Comparing a portfolio with a delisted holding surfaces it in ``dropped``."""
+    client, teardown = build_client_with(StaggeredProvider())
+    try:
+        headers = auth_headers(client, "cmp_dropped")
+        a = _make_portfolio(
+            client,
+            headers,
+            "HasDelisted",
+            [{"symbol": "AAPL", "weight": 0.6}, {"symbol": "DELISTED", "weight": 0.4}],
+        )
+        b = _make_portfolio(client, headers, "Clean", [{"symbol": "MSFT", "weight": 1.0}])
+        body = {"portfolio_ids": [a, b], "start": "2021-01-04", "benchmark": "SPY"}
+        resp = client.post("/api/compare", json=body, headers=headers)
+        assert resp.status_code == 200, resp.text
+        results = {r["name"]: r for r in resp.json()["results"]}
+        assert results["HasDelisted"]["dropped"] == ["DELISTED"]
+        assert results["Clean"]["dropped"] == []
+    finally:
+        teardown()
 
 
 def test_valuations_foreign_id_is_404(client):

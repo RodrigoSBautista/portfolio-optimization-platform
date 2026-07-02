@@ -152,6 +152,9 @@ class CompareResult(BaseModel):
     final_value: float
     invested: float
     metrics: dict[str, str]
+    # Holdings that returned no price data in the shared window (parity with
+    # SimulateResponse.dropped); e.g. a delisted ticker silently drops out.
+    dropped: list[str] = Field(default_factory=list)
 
 
 class CompareResponse(BaseModel):

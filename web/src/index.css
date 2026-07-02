@@ -10,8 +10,8 @@ body,
 
 body {
   @apply bg-surface text-content dark:bg-surface-dark dark:text-content-dark;
-  font-family: "Google Sans", Roboto, system-ui, -apple-system, "Segoe UI", Arial,
-    sans-serif;
+  font-family: "Inter Variable", "Google Sans", Roboto, system-ui, -apple-system,
+    "Segoe UI", Arial, sans-serif;
   margin: 0;
 }
 

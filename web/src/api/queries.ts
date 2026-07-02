@@ -5,14 +5,17 @@ import {
 } from "@tanstack/react-query";
 import * as endpoints from "./endpoints";
 import type {
+  CompareRequest,
   OptimizeRequest,
   PortfolioSpec,
+  RefreshRequest,
   SimulateRequest,
 } from "./types";
 
 export const keys = {
   tickers: ["tickers"] as const,
   portfolios: ["portfolios"] as const,
+  valuations: (id: number) => ["valuations", id] as const,
 };
 
 export function useTickers() {
@@ -58,5 +61,35 @@ export function useSimulation(req: SimulateRequest | null) {
 export function useOptimize() {
   return useMutation({
     mutationFn: (req: OptimizeRequest) => endpoints.optimize(req),
+  });
+}
+
+// Compare 2–3 saved portfolios. Keyed by the full request so range/benchmark/
+// selection changes re-fetch and cache.
+export function useCompare(req: CompareRequest | null) {
+  return useQuery({
+    queryKey: ["compare", req],
+    queryFn: () => endpoints.compare(req as CompareRequest),
+    enabled: !!req,
+  });
+}
+
+// Stored valuation history for one portfolio (tracking dashboard).
+export function useValuations(id: number | null) {
+  return useQuery({
+    queryKey: id != null ? keys.valuations(id) : ["valuations", "none"],
+    queryFn: () => endpoints.fetchValuations(id as number),
+    enabled: id != null,
+  });
+}
+
+// Refresh (recompute + persist) a portfolio's valuations, then refetch them.
+export function useRefreshValuations() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, req }: { id: number; req?: RefreshRequest }) =>
+      endpoints.refreshValuations(id, req),
+    onSuccess: (_data, { id }) =>
+      qc.invalidateQueries({ queryKey: keys.valuations(id) }),
   });
 }

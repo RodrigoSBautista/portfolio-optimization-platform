@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { toast } from "sonner";
 import { apiErrorMessage } from "../api/client";
 import { useOptimize } from "../api/queries";
 import {
@@ -11,7 +12,11 @@ import {
 } from "../api/types";
 import { ComparisonChart } from "../charts/ComparisonChart";
 import { WeightsBar } from "../charts/WeightsBar";
+import { Card, SectionHeader } from "../components/Card";
+import { EmptyState } from "../components/EmptyState";
+import { SparklesIcon } from "../components/icons";
 import { MetricsTable } from "../components/MetricsTable";
+import { ChartSkeleton, TableSkeleton } from "../components/Skeleton";
 import { TickerSearch } from "../components/TickerSearch";
 
 interface Props {
@@ -66,7 +71,9 @@ export function Optimize({ onSaveAsPortfolio }: Props) {
     try {
       await optimize.mutateAsync(req);
     } catch (err) {
-      setError(apiErrorMessage(err, "Optimization failed."));
+      const msg = apiErrorMessage(err, "Optimization failed.");
+      setError(msg);
+      toast.error(msg);
     }
   }
 
@@ -232,7 +239,7 @@ export function Optimize({ onSaveAsPortfolio }: Props) {
           <button
             onClick={run}
             disabled={optimize.isPending}
-            className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-60"
+            className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-surface disabled:opacity-60 dark:focus-visible:ring-offset-surface-dark"
           >
             {optimize.isPending ? "Optimizing…" : "Run optimization"}
           </button>
@@ -241,12 +248,31 @@ export function Optimize({ onSaveAsPortfolio }: Props) {
         {/* Results */}
         <div className="flex flex-col gap-4">
           {!result && !optimize.isPending && (
-            <div className="flex h-full min-h-[300px] items-center justify-center rounded-lg border border-dashed border-edge text-sm text-content-muted dark:border-edge-dark dark:text-content-dark-muted">
-              Pick tickers and run an optimization to see suggested weights.
-            </div>
+            <EmptyState
+              icon={<SparklesIcon size={40} />}
+              title="No optimization yet"
+              message="Pick tickers and run an optimization to see suggested weights vs an equal-weight baseline and a benchmark."
+            />
           )}
 
-          {result && (
+          {optimize.isPending && (
+            <>
+              <Card className="p-4">
+                <SectionHeader>Suggested vs equal weight</SectionHeader>
+                <ChartSkeleton height={220} />
+              </Card>
+              <Card className="p-4">
+                <SectionHeader>Growth comparison</SectionHeader>
+                <ChartSkeleton height={280} />
+              </Card>
+              <Card className="p-4">
+                <SectionHeader>Metrics</SectionHeader>
+                <TableSkeleton />
+              </Card>
+            </>
+          )}
+
+          {result && !optimize.isPending && (
             <>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-sm text-content-muted dark:text-content-dark-muted">
@@ -256,31 +282,29 @@ export function Optimize({ onSaveAsPortfolio }: Props) {
                   onClick={() =>
                     onSaveAsPortfolio(result.suggested, benchmark.toUpperCase())
                   }
-                  className="rounded-md border border-edge px-3 py-1.5 text-sm font-medium hover:bg-surface-alt dark:border-edge-dark dark:hover:bg-surface-dark-alt"
+                  className="rounded-lg border border-edge px-3 py-1.5 text-sm font-medium transition hover:bg-surface-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand dark:border-edge-dark dark:hover:bg-surface-dark-alt"
                 >
                   Save as portfolio
                 </button>
               </div>
 
-              <section className="rounded-lg border border-edge bg-surface p-4 dark:border-edge-dark dark:bg-surface-dark">
-                <h2 className="mb-3 text-sm font-semibold">
-                  Suggested vs equal weight
-                </h2>
+              <Card className="p-4">
+                <SectionHeader>Suggested vs equal weight</SectionHeader>
                 <WeightsBar suggested={result.suggested} baseline={result.baseline} />
-              </section>
+              </Card>
 
-              <section className="rounded-lg border border-edge bg-surface p-4 dark:border-edge-dark dark:bg-surface-dark">
-                <h2 className="mb-3 text-sm font-semibold">Growth comparison</h2>
+              <Card className="p-4">
+                <SectionHeader>Growth comparison</SectionHeader>
                 <ComparisonChart
                   series={result.comparison_series}
                   benchmarkLabel={benchmark.toUpperCase()}
                 />
-              </section>
+              </Card>
 
-              <section className="rounded-lg border border-edge bg-surface p-4 dark:border-edge-dark dark:bg-surface-dark">
-                <h2 className="mb-3 text-sm font-semibold">Metrics</h2>
+              <Card className="p-4">
+                <SectionHeader>Metrics</SectionHeader>
                 <MetricsTable metrics={result.metrics} />
-              </section>
+              </Card>
             </>
           )}
         </div>

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { toast } from "sonner";
 import { apiErrorMessage } from "../api/client";
 import { useCreatePortfolio } from "../api/queries";
 import type { Contribution, Portfolio, PortfolioSpec } from "../api/types";
@@ -92,7 +93,9 @@ export function NewPortfolio({
       const created = await create.mutateAsync(spec);
       onCreated(created);
     } catch (err) {
-      setError(apiErrorMessage(err, "Could not save the portfolio."));
+      const msg = apiErrorMessage(err, "Could not save the portfolio.");
+      setError(msg);
+      toast.error(msg);
     }
   }
 

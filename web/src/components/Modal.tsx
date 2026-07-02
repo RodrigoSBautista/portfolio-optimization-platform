@@ -1,3 +1,7 @@
+import { useEffect } from "react";
+import { motion, useReducedMotion } from "framer-motion";
+import { CloseIcon } from "./icons";
+
 interface Props {
   title: string;
   onClose: () => void;
@@ -5,13 +9,29 @@ interface Props {
 }
 
 export function Modal({ title, onClose, children }: Props) {
+  const reduce = useReducedMotion();
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
   return (
     <div
-      className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-black/40 p-4 sm:p-8"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 sm:p-8"
       onClick={onClose}
+      role="dialog"
+      aria-modal
+      aria-label={title}
     >
-      <div
-        className="w-full max-w-2xl rounded-lg border border-edge bg-surface shadow-xl dark:border-edge-dark dark:bg-surface-dark"
+      <motion.div
+        initial={reduce ? false : { opacity: 0, y: 8, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: reduce ? 0 : 0.2, ease: "easeOut" }}
+        className="w-full max-w-2xl rounded-xl border border-edge bg-surface shadow-xl dark:border-edge-dark dark:bg-surface-dark"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-edge px-4 py-3 dark:border-edge-dark">
@@ -19,13 +39,13 @@ export function Modal({ title, onClose, children }: Props) {
           <button
             onClick={onClose}
             aria-label="Close"
-            className="rounded p-1 text-content-muted hover:bg-surface-alt dark:text-content-dark-muted dark:hover:bg-surface-dark-alt"
+            className="rounded-lg p-1 text-content-muted hover:bg-surface-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand dark:text-content-dark-muted dark:hover:bg-surface-dark-alt"
           >
-            ✕
+            <CloseIcon size={18} />
           </button>
         </div>
         <div className="p-4">{children}</div>
-      </div>
+      </motion.div>
     </div>
   );
 }

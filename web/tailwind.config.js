@@ -27,6 +27,24 @@ export default {
         up: "#1a7f37",
         down: "#d1242f",
       },
+      borderRadius: {
+        xl: "0.875rem", // 14px — soft card corners
+        "2xl": "1.125rem",
+      },
+      boxShadow: {
+        // Layered soft shadows for surfaces (light theme). Dark relies on borders.
+        card: "0 1px 2px rgba(60,64,67,0.06), 0 1px 3px rgba(60,64,67,0.10)",
+        "card-hover":
+          "0 2px 6px rgba(60,64,67,0.10), 0 4px 12px rgba(60,64,67,0.12)",
+      },
+      keyframes: {
+        shimmer: {
+          "100%": { transform: "translateX(100%)" },
+        },
+      },
+      animation: {
+        shimmer: "shimmer 1.6s infinite",
+      },
     },
   },
   plugins: [],

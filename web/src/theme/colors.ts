@@ -35,3 +35,16 @@ export const DARK_CHART: ChartTheme = {
 export function trendColor(gainPct: number): string {
   return gainPct >= 0 ? UP : DOWN;
 }
+
+// Categorical palette for multi-series charts (e.g. Compare). Chosen to be
+// distinguishable in both light and dark themes and to avoid clashing with the
+// green/red return semantics used elsewhere.
+export const SERIES_PALETTE = [
+  "#1a73e8", // blue
+  "#9334e6", // purple
+  "#e8710a", // orange
+];
+
+export function seriesColor(i: number): string {
+  return SERIES_PALETTE[i % SERIES_PALETTE.length];
+}

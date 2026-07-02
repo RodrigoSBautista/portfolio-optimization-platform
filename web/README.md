@@ -61,7 +61,7 @@ src/
   theme/      # ThemeContext/provider, chart color tokens, useTheme/useChartTheme
   charts/     # recharts: GrowthChart, ComparisonChart, WeightsBar, Sparkline
   components/  # Sidebar, TopBar, ThemeToggle, TickerSearch, MetricsTable, Modal, …
-  views/      # Login, AppShell, Dashboard, NewPortfolio, Optimize
+  views/      # Login, Layout, Dashboard, NewPortfolio, Optimize, Compare, Tracking
   lib/        # date ranges, formatting, benchmark index specs
 ```
 

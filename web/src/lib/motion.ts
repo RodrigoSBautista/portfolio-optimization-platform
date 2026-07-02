@@ -30,10 +30,3 @@ export const pageTransition: Variants = {
   show: { opacity: 1, y: 0, transition: { duration: 0.22, ease: "easeOut" } },
   exit: { opacity: 0, y: -6, transition: { duration: 0.15 } },
 };
-
-// When reduced motion is requested, collapse a variant set to an instant show.
-export const instant: Variants = {
-  hidden: { opacity: 1 },
-  show: { opacity: 1, transition: { duration: 0 } },
-  exit: { opacity: 1 },
-};

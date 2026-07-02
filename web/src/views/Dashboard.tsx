@@ -164,9 +164,11 @@ export function Dashboard({ portfolio, onDelete }: Props) {
               label="Total return (%, time-weighted)"
               value={data.metrics[portfolio.name]?.["Total return"] ?? "—"}
               tone={
-                metricSign(data.metrics[portfolio.name]?.["Total return"]) >= 0
-                  ? "up"
-                  : "down"
+                data.metrics[portfolio.name]?.["Total return"] == null
+                  ? "neutral" // missing metric renders the "—" placeholder uncolored
+                  : metricSign(data.metrics[portfolio.name]?.["Total return"]) >= 0
+                    ? "up"
+                    : "down"
               }
             />
             {renderMetricKpis(data.metrics, portfolio.name)}

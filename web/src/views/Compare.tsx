@@ -52,6 +52,16 @@ export function Compare() {
     });
   }
 
+  // Results are only shown while the inputs still match the submitted request —
+  // changing the selection, range, or benchmark hides the now-stale comparison.
+  const submittedKey = req
+    ? JSON.stringify([req.portfolio_ids, req.start, req.benchmark])
+    : null;
+  const currentKey = valid
+    ? JSON.stringify([ids, startForRange(range), benchmark.toUpperCase()])
+    : null;
+  const fresh = submittedKey !== null && submittedKey === currentKey;
+
   if (portfolios.length < 2) {
     return (
       <div className="p-4 md:p-6">
@@ -170,7 +180,9 @@ export function Compare() {
         </div>
       )}
 
-      {data && !isFetching && <Results data={data} reduce={!!reduce} />}
+      {data && !isFetching && !isError && fresh && (
+        <Results data={data} reduce={!!reduce} />
+      )}
     </div>
   );
 }
@@ -194,9 +206,18 @@ function Results({
   data: NonNullable<ReturnType<typeof useCompare>["data"]>;
   reduce: boolean;
 }) {
+  // Disambiguate duplicate portfolio names so chart labels and metrics-table
+  // columns never collapse into one another.
+  const nameCounts = new Map<string, number>();
+  for (const r of data.results) {
+    nameCounts.set(r.name, (nameCounts.get(r.name) ?? 0) + 1);
+  }
+  const labelFor = (r: { name: string; id: number }) =>
+    (nameCounts.get(r.name) ?? 0) > 1 ? `${r.name} (#${r.id})` : r.name;
+
   const series: NamedSeries[] = data.results.map((r) => ({
     key: `p${r.id}`,
-    label: r.name,
+    label: labelFor(r),
     points: r.series,
   }));
 
@@ -207,9 +228,10 @@ function Results({
   // Build a metrics table with one column per portfolio + a benchmark column.
   const metrics: Metrics = useMemo(() => {
     const m: Metrics = {};
-    for (const r of data.results) m[r.name] = r.metrics;
+    for (const r of data.results) m[labelFor(r)] = r.metrics;
     if (data.benchmark_metrics) m["Benchmark"] = data.benchmark_metrics;
     return m;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data]);
 
   return (
@@ -218,7 +240,7 @@ function Results({
         <MultiSeriesChart series={series} benchmark={benchmark} />
       </Card>
 
-      {/* Side-by-side KPI columns. Invested is EQUAL across portfolios by design. */}
+      {/* Side-by-side KPI columns — each portfolio uses its own saved contribution plan. */}
       <motion.div
         className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3"
         variants={reduce ? undefined : staggerContainer}
@@ -238,7 +260,7 @@ function Results({
                   className="inline-block h-3 w-3 rounded-full"
                   style={{ background: seriesColor(i) }}
                 />
-                <span className="truncate text-sm font-semibold">{r.name}</span>
+                <span className="truncate text-sm font-semibold">{labelFor(r)}</span>
               </div>
               <dl className="flex flex-col gap-1.5 text-sm">
                 <Row label="Final value" value={formatCurrency(r.final_value)} />
@@ -249,13 +271,19 @@ function Results({
                   className={seriesColorClass(gain)}
                 />
               </dl>
+              {r.dropped.length > 0 && (
+                <p className="mt-2 text-xs text-down">
+                  Excluded (no price data in window): {r.dropped.join(", ")}
+                </p>
+              )}
             </motion.div>
           );
         })}
       </motion.div>
       <p className="text-xs text-content-muted dark:text-content-dark-muted">
-        Invested (cost basis) is equal across portfolios by design — the same
-        contribution plan is applied to each so only the allocations differ.
+        All portfolios are simulated over the same aligned date window. Each uses
+        its own saved contribution plan, so Invested can differ. The benchmark
+        line follows the first selected portfolio's contribution schedule.
       </p>
 
       <Card className="p-4">

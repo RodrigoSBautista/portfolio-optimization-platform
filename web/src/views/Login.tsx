@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { apiErrorMessage } from "../api/client";
 import { useAuth } from "../auth/useAuth";
 import { ThemeToggle } from "../components/ThemeToggle";
@@ -8,6 +8,7 @@ import { ThemeToggle } from "../components/ThemeToggle";
 export function Login() {
   const { login, signup } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const reduce = useReducedMotion();
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [username, setUsername] = useState("");
@@ -22,7 +23,11 @@ export function Login() {
     try {
       if (mode === "login") await login(username, password);
       else await signup(username, password);
-      navigate("/", { replace: true });
+      // Return to the page the user was originally headed to (deep links).
+      const from =
+        (location.state as { from?: { pathname?: string } } | null)?.from
+          ?.pathname ?? "/";
+      navigate(from, { replace: true });
     } catch (err) {
       setError(apiErrorMessage(err, "Authentication failed"));
     } finally {

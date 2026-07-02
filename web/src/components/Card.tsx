@@ -1,4 +1,4 @@
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { riseItem } from "../lib/motion";
 
 interface CardProps {
@@ -13,6 +13,7 @@ interface CardProps {
 // optional entrance as a motion item. Dark theme leans on the border, light on
 // the layered shadow.
 export function Card({ children, className = "", animate = false, hover = false }: CardProps) {
+  const reduce = useReducedMotion();
   const base =
     "rounded-xl border border-edge bg-surface shadow-card dark:border-edge-dark dark:bg-surface-dark dark:shadow-none";
   const hoverCls = hover
@@ -22,7 +23,7 @@ export function Card({ children, className = "", animate = false, hover = false 
     return (
       <motion.div
         variants={riseItem}
-        whileHover={hover ? { y: -1 } : undefined}
+        whileHover={hover && !reduce ? { y: -1 } : undefined}
         className={`${base} ${hoverCls} ${className}`}
       >
         {children}

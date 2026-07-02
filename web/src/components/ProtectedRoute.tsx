@@ -1,8 +1,9 @@
-import { Navigate, Outlet } from "react-router-dom";
+import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../auth/useAuth";
 
 export function ProtectedRoute() {
   const { isAuthenticated, isLoading } = useAuth();
+  const location = useLocation();
   if (isLoading) {
     return (
       <div
@@ -14,5 +15,10 @@ export function ProtectedRoute() {
       </div>
     );
   }
-  return isAuthenticated ? <Outlet /> : <Navigate to="/login" replace />;
+  // Remember where the user was headed so Login can return them there.
+  return isAuthenticated ? (
+    <Outlet />
+  ) : (
+    <Navigate to="/login" replace state={{ from: location }} />
+  );
 }

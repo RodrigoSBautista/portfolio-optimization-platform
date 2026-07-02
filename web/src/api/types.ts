@@ -128,6 +128,8 @@ export interface CompareResult {
   final_value: number;
   invested: number;
   metrics: MetricBlock;
+  // Holdings excluded because they had no price data in the shared window.
+  dropped: string[];
 }
 
 export interface CompareRequest {

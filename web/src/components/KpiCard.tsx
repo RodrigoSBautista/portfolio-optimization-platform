@@ -1,4 +1,4 @@
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { CountUp } from "./CountUp";
 import { riseItem } from "../lib/motion";
 
@@ -18,6 +18,7 @@ interface Props {
 // item inside a motion container). Motion is inherited from the parent's
 // reduced-motion gating via variants.
 export function KpiCard({ label, value, tone = "neutral", countTo, format }: Props) {
+  const reduce = useReducedMotion();
   const toneClass =
     tone === "up"
       ? "text-up"
@@ -27,7 +28,7 @@ export function KpiCard({ label, value, tone = "neutral", countTo, format }: Pro
   return (
     <motion.div
       variants={riseItem}
-      whileHover={{ y: -1 }}
+      whileHover={reduce ? undefined : { y: -1 }}
       className="rounded-xl border border-edge bg-surface-alt px-4 py-3 shadow-card transition-shadow hover:shadow-card-hover dark:border-edge-dark dark:bg-surface-dark-alt dark:shadow-none"
     >
       <div className="text-xs text-content-muted dark:text-content-dark-muted">

@@ -129,3 +129,56 @@ class OptimizeResponse(BaseModel):
     baseline: dict[str, float]
     comparison_series: list[ComparisonPoint]
     metrics: dict[str, dict[str, str]]
+
+
+# --- compare --------------------------------------------------------------------
+
+
+class CompareRequest(BaseModel):
+    portfolio_ids: list[int] = Field(min_length=2, max_length=3)
+    start: date
+    benchmark: str = "SPY"
+
+
+class ValueSeriesPoint(BaseModel):
+    date: date
+    value: float
+
+
+class CompareResult(BaseModel):
+    id: int
+    name: str
+    series: list[ValueSeriesPoint]
+    final_value: float
+    invested: float
+    metrics: dict[str, str]
+    # Holdings that returned no price data in the shared window (parity with
+    # SimulateResponse.dropped); e.g. a delisted ticker silently drops out.
+    dropped: list[str] = Field(default_factory=list)
+
+
+class CompareResponse(BaseModel):
+    results: list[CompareResult]
+    benchmark_series: list[ValueSeriesPoint] | None = None
+    benchmark_metrics: dict[str, str] | None = None
+
+
+# --- tracking (valuations + refresh) --------------------------------------------
+
+
+class ValuationPoint(BaseModel):
+    date: date
+    market_value: float
+    benchmark_value: float | None = None
+
+
+class ValuationsResponse(BaseModel):
+    valuations: list[ValuationPoint]
+
+
+class RefreshRequest(BaseModel):
+    start: date | None = None
+
+
+class RefreshResponse(BaseModel):
+    written: int

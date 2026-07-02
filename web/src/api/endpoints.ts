@@ -2,15 +2,20 @@
 // reads input, calls these, and renders the result.
 import { api } from "./client";
 import type {
+  CompareRequest,
+  CompareResponse,
   OptimizeRequest,
   OptimizeResponse,
   Portfolio,
   PortfolioSpec,
+  RefreshRequest,
+  RefreshResponse,
   SimulateRequest,
   SimulateResponse,
   Ticker,
   Token,
   User,
+  ValuationsResponse,
 } from "./types";
 
 export async function signup(username: string, password: string): Promise<Token> {
@@ -54,5 +59,28 @@ export async function simulate(req: SimulateRequest): Promise<SimulateResponse> 
 
 export async function optimize(req: OptimizeRequest): Promise<OptimizeResponse> {
   const { data } = await api.post<OptimizeResponse>("/api/optimize", req);
+  return data;
+}
+
+export async function compare(req: CompareRequest): Promise<CompareResponse> {
+  const { data } = await api.post<CompareResponse>("/api/compare", req);
+  return data;
+}
+
+export async function fetchValuations(id: number): Promise<ValuationsResponse> {
+  const { data } = await api.get<ValuationsResponse>(
+    `/api/portfolios/${id}/valuations`,
+  );
+  return data;
+}
+
+export async function refreshValuations(
+  id: number,
+  req: RefreshRequest = {},
+): Promise<RefreshResponse> {
+  const { data } = await api.post<RefreshResponse>(
+    `/api/portfolios/${id}/refresh`,
+    req,
+  );
   return data;
 }

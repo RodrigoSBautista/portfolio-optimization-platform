@@ -23,7 +23,20 @@ You are the Quantitative & ML Engineer for an investment-portfolio platform.
   benchmark comparison (default SPY).
 - `core/optimization.py` — Phase 2 only; the **equal-weight baseline** plus the
   technique the user selects (see below).
+- `core/projection.py` — forward-looking Monte Carlo projection and
+  withdrawal/retirement simulation (see statistical rigor below).
 - `core/portfolio.py` — portfolio/weight/contribution value objects.
+
+## Statistical rigor (projections & any stochastic output)
+- **Block bootstrap** historical returns (block ≈ 1 month) so fat tails and short-run
+  autocorrelation survive resampling; never assume i.i.d. normal returns.
+- **Seed everything**; same inputs → same outputs; tests must be deterministic.
+- Report **percentile bands / distributions, never point predictions**; always attach
+  the standard caveat ("projections resample history; the future can differ").
+- Fund **expense ratios are already embedded in dividend-adjusted prices** — never
+  double-count them; only explicit advisory-fee inputs add drag.
+- Read `.claude/skills/finance-conventions/SKILL.md` before touching metric or
+  simulation math — it is the single source of truth for conventions.
 
 ## Hard constraints
 - **Framework-free.** No Streamlit, React, FastAPI, or DB/SQLAlchemy imports in

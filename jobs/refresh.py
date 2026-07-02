@@ -29,9 +29,15 @@ from storage.repository import Repository
 def build_valuations(
     spec: PortfolioSpec, port_prices: pd.DataFrame, bench_prices: pd.DataFrame
 ) -> pd.DataFrame:
-    """Return a [date x (market_value, benchmark_value)] frame for the spec."""
+    """Return a [date x (market_value, benchmark_value)] frame for the spec.
+
+    Only the tickers present in ``port_prices`` are weighted: a holding that returned
+    no price data (delisted/invalid) is dropped so ``simulate_portfolio`` never sees a
+    weight without a matching column. Mirrors ``app.sim_runner.run_simulation``.
+    """
     kwargs = spec.simulation_kwargs()
-    portfolio = simulate_portfolio(port_prices, spec.weights(), **kwargs)
+    weights = {s: w for s, w in spec.weights().items() if s in port_prices.columns}
+    portfolio = simulate_portfolio(port_prices, weights, **kwargs)
     benchmark = simulate_portfolio(bench_prices, {spec.benchmark_symbol.upper(): 1.0}, **kwargs)
     frame = pd.DataFrame(
         {"market_value": portfolio["value"], "benchmark_value": benchmark["value"]}

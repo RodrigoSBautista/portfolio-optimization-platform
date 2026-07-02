@@ -24,6 +24,7 @@ from api.schemas import (
     ValueSeriesPoint,
 )
 from app.sim_runner import SimError, format_metrics, run_simulation
+from core.portfolio import PortfolioSpec
 from data.prices import PriceService
 from data.provider import common_history
 from jobs.refresh import refresh_portfolio
@@ -44,14 +45,24 @@ def compare(
     """Compare 2–3 saved portfolios over one shared window vs a shared benchmark.
 
     Fairness: every ticker (all holdings of every selected portfolio + the benchmark)
-    is fetched in one call and aligned to a single common window, so total invested and
-    the contribution schedule match across portfolios (apples-to-apples). Mirrors the
-    logic in ``app/views/compare.py``.
+    is fetched in one call and aligned to a single common window, so every portfolio is
+    simulated over the *same date range*. Each portfolio still uses its own saved
+    contribution schedule, so ``invested`` matches only across portfolios whose schedules
+    coincide. ``benchmark_series`` is simulated with the FIRST portfolio's schedule, so
+    its dollar line lines up only with portfolios sharing that schedule (the benchmark's
+    return metrics are schedule-independent). Mirrors the logic in ``app/views/compare.py``.
     """
     benchmark = body.benchmark.upper()
 
+    # Reject duplicate ids: [5, 5] is not a real 2-way comparison.
+    if len(set(body.portfolio_ids)) != len(body.portfolio_ids):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="portfolio_ids must be distinct",
+        )
+
     # Load each portfolio (404 on any id the caller doesn't own).
-    ordered: list[tuple[int, object]] = []
+    ordered: list[tuple[int, PortfolioSpec]] = []
     for pid in body.portfolio_ids:
         orm = repo.get_portfolio(user.id, pid)
         if orm is None:
@@ -101,6 +112,7 @@ def compare(
                 final_value=res.final_value,
                 invested=res.invested,
                 metrics=format_metrics(res.sim["twr_index"]),
+                dropped=res.dropped,
             )
         )
         # The benchmark is identical across portfolios (shared window/flows): build once.
@@ -153,7 +165,14 @@ def refresh(
 
     # Default window matches the Streamlit tracking default: Jan 1 three years ago.
     start = (body.start if body and body.start else None) or date(date.today().year - 3, 1, 1)
-    written = refresh_portfolio(
-        repo, prices_svc, user.id, portfolio_id, orm_to_spec(orm), start
-    )
+    try:
+        written = refresh_portfolio(
+            repo, prices_svc, user.id, portfolio_id, orm_to_spec(orm), start
+        )
+    except ValueError as exc:
+        # Belt: the source now filters price-less holdings, but any residual simulation
+        # error (e.g. degenerate window) is a 422, not an unhandled 500.
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
     return RefreshResponse(written=written)

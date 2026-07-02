@@ -19,10 +19,8 @@ export function CountUp({ value, format, durationMs = 700 }: Props) {
   const rafRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (reduce) {
-      setDisplay(value);
-      return;
-    }
+    // Reduced motion: render the target verbatim (no animation, no setState here).
+    if (reduce) return;
     const from = fromRef.current;
     const to = value;
     if (from === to) return;
@@ -30,7 +28,7 @@ export function CountUp({ value, format, durationMs = 700 }: Props) {
 
     function tick(now: number) {
       const t = Math.min(1, (now - start) / durationMs);
-      // easeOutCubic for a natural settle.
+      // easeOutCubic for a natural settle. rAF-driven setState (async) is fine.
       const eased = 1 - Math.pow(1 - t, 3);
       setDisplay(from + (to - from) * eased);
       if (t < 1) {
@@ -46,5 +44,5 @@ export function CountUp({ value, format, durationMs = 700 }: Props) {
     };
   }, [value, durationMs, reduce]);
 
-  return <>{format(display)}</>;
+  return <>{format(reduce ? value : display)}</>;
 }

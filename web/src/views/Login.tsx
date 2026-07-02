@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { motion, useReducedMotion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { apiErrorMessage } from "../api/client";
 import { useAuth } from "../auth/useAuth";
@@ -7,6 +8,7 @@ import { ThemeToggle } from "../components/ThemeToggle";
 export function Login() {
   const { login, signup } = useAuth();
   const navigate = useNavigate();
+  const reduce = useReducedMotion();
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -29,12 +31,27 @@ export function Login() {
   }
 
   return (
-    <div className="flex min-h-full flex-col bg-surface dark:bg-surface-dark">
-      <div className="flex justify-end p-3">
+    <div className="relative flex min-h-full flex-col overflow-hidden bg-surface dark:bg-surface-dark">
+      {/* Subtle mesh/gradient backdrop. */}
+      <div
+        className="pointer-events-none absolute inset-0 opacity-70 dark:opacity-50"
+        aria-hidden
+        style={{
+          background:
+            "radial-gradient(60rem 40rem at 15% -10%, rgba(26,115,232,0.18), transparent 60%), radial-gradient(50rem 40rem at 110% 110%, rgba(26,127,55,0.14), transparent 55%)",
+        }}
+      />
+
+      <div className="relative flex justify-end p-3">
         <ThemeToggle />
       </div>
-      <div className="flex flex-1 items-center justify-center px-4">
-        <div className="w-full max-w-sm">
+      <div className="relative flex flex-1 items-center justify-center px-4 pb-16">
+        <motion.div
+          className="w-full max-w-sm"
+          initial={reduce ? false : { opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: reduce ? 0 : 0.35, ease: "easeOut" }}
+        >
           <div className="mb-6 text-center">
             <h1 className="text-2xl font-semibold">
               <span className="text-brand">Portfolio</span>{" "}
@@ -49,7 +66,7 @@ export function Login() {
 
           <form
             onSubmit={submit}
-            className="rounded-lg border border-edge bg-surface-alt p-5 dark:border-edge-dark dark:bg-surface-dark-alt"
+            className="rounded-2xl border border-edge bg-surface-alt/80 p-5 shadow-card backdrop-blur-sm dark:border-edge-dark dark:bg-surface-dark-alt/80 dark:shadow-none"
           >
             <label className="mb-3 block">
               <span className="mb-1 block text-xs text-content-muted dark:text-content-dark-muted">
@@ -60,7 +77,7 @@ export function Login() {
                 onChange={(e) => setUsername(e.target.value)}
                 autoComplete="username"
                 required
-                className="w-full rounded-md border border-edge bg-surface px-3 py-2 text-sm outline-none focus:border-brand dark:border-edge-dark dark:bg-surface-dark"
+                className="w-full rounded-lg border border-edge bg-surface px-3 py-2 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/30 dark:border-edge-dark dark:bg-surface-dark"
               />
             </label>
             <label className="mb-4 block">
@@ -73,12 +90,12 @@ export function Login() {
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete={mode === "login" ? "current-password" : "new-password"}
                 required
-                className="w-full rounded-md border border-edge bg-surface px-3 py-2 text-sm outline-none focus:border-brand dark:border-edge-dark dark:bg-surface-dark"
+                className="w-full rounded-lg border border-edge bg-surface px-3 py-2 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/30 dark:border-edge-dark dark:bg-surface-dark"
               />
             </label>
 
             {error && (
-              <div className="mb-3 rounded-md border border-down/40 bg-down/10 px-3 py-2 text-sm text-down">
+              <div className="mb-3 rounded-lg border border-down/40 bg-down/10 px-3 py-2 text-sm text-down">
                 {error}
               </div>
             )}
@@ -86,7 +103,7 @@ export function Login() {
             <button
               type="submit"
               disabled={busy}
-              className="w-full rounded-md bg-brand px-3 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-60"
+              className="w-full rounded-lg bg-brand px-3 py-2 text-sm font-medium text-white transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-surface-alt disabled:opacity-60 dark:focus-visible:ring-offset-surface-dark-alt"
             >
               {busy ? "Please wait…" : mode === "login" ? "Log in" : "Sign up"}
             </button>
@@ -99,7 +116,7 @@ export function Login() {
                 setMode(mode === "login" ? "signup" : "login");
                 setError(null);
               }}
-              className="font-medium text-brand hover:underline"
+              className="font-medium text-brand hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
             >
               {mode === "login" ? "Sign up" : "Log in"}
             </button>
@@ -108,7 +125,7 @@ export function Login() {
           <p className="mt-6 text-center text-xs text-content-muted dark:text-content-dark-muted">
             Educational use only — not financial advice.
           </p>
-        </div>
+        </motion.div>
       </div>
     </div>
   );

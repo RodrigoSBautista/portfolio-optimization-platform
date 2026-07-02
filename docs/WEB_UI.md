@@ -61,12 +61,32 @@ UI, or seed a demo user with the existing `storage.Repository` against the same
 - The DB is local SQLite for now; the production phase moves it to Supabase/Postgres
   (only the `DATABASE_URL` changes — the schema/migrations are unchanged).
 
-## Features (MVP)
+## Features
 
-Login/signup · sidebar of portfolios + benchmark indices with green/red sparklines ·
-**dashboard** growth area chart (green/red) with time-range tabs + a KPI grid (all
-percentages time-weighted for consistency) + a metrics-vs-benchmark table ·
-**new portfolio** (ticker search, weights or $-amounts, contributions) · **optimize**
-(allocate/select, suggested vs equal-weight). Compare + Tracking views are follow-ups.
+Login/signup (deep links survive the login round-trip) · sidebar of portfolios +
+benchmark indices with green/red sparklines · **dashboard** growth area chart
+(green/red, legend chips to toggle the benchmark/invested series) with time-range
+tabs + a KPI grid (all percentages time-weighted for consistency) + a
+metrics-vs-benchmark table · **new portfolio** (ticker search, weights or $-amounts,
+contributions) · **optimize** (allocate/select, suggested vs equal-weight) ·
+**compare** (2–3 saved portfolios on one chart over a shared window; each keeps its
+own saved contribution plan) · **tracking** (stored daily valuations vs benchmark +
+"Refresh now").
+
+![Compare](screenshots/web-compare.png)
+![Tracking](screenshots/web-tracking.png)
+
+## Design system (v2)
+
+Inter variable font · Tailwind tokens (rounded-xl surfaces, layered shadows) ·
+skeleton shimmer loaders · Framer Motion (staggered entrances, KPI count-ups, chart
+cross-fades, route transitions — all gated behind `prefers-reduced-motion`) · sonner
+toasts · **responsive**: below `lg` the sidebar becomes a slide-in drawer
+(hamburger, Escape/backdrop/route-change close); usable at 390px width.
+
+<img src="screenshots/web-mobile.png" alt="Mobile drawer" width="300">
+
+Known follow-ups: focus trap in drawer/modal; route-level code-splitting (single
+~900 kB JS chunk); batching the sidebar's per-row simulate calls.
 
 > **Educational use only — not financial advice.**

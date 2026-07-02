@@ -8,14 +8,14 @@ _Last updated: 2026-06-13_
 
 ## Next step (start here on resume)
 
-- **Web UI (FastAPI + React) MVP is complete** (built alongside Streamlit; SQLite).
+- **Web UI v2 is complete** (modern design system + Compare & Tracking in React).
   Remaining for the **Final Phase (production)**: SQLite→**Supabase Postgres**
   (Alembic — only `DATABASE_URL` changes), **GitHub Actions cron** for daily refresh,
-  auth hardening (require `AUTH_SECRET`; refresh tokens), **Compare + Tracking views
-  in React** (currently web-MVP has dashboard/simulation/optimize), and **cloud
-  deploy**. See `docs/PLAN.md` Final Phase + [docs/WEB_UI.md](WEB_UI.md).
+  auth hardening (refresh tokens), and **cloud deploy**. See `docs/PLAN.md` Final
+  Phase + [docs/WEB_UI.md](WEB_UI.md).
 - **Web-UI known follow-ups (non-blocking):** sidebar does one `/api/simulate` per row
-  (N+1 live fetches — fine for a few portfolios; batch later); JWT in `localStorage`.
+  (N+1 live fetches — fine for a few portfolios; batch later); JWT in `localStorage`;
+  focus trap in drawer/modal; route-level code-splitting (~900 kB JS chunk).
 - **Known Phase 1 follow-ups (non-blocking):** tracking metrics are value-based
   (honest caption added); a correct TWR-based tracking metric would need storing the
   `twr_index` in `daily_valuations` (schema migration). Auth signup has a benign
@@ -28,28 +28,28 @@ _Last updated: 2026-06-13_
 
 ## In progress
 
-- **Branch `feat/web-modern-ui` — React web UI modernization + Compare/Tracking.**
-  Increment B (modernization): Inter variable font, refined Tailwind tokens
-  (radius/soft-shadows/shimmer), reusable `Skeleton`/`Card`/`EmptyState`/`CountUp`
-  primitives, framer-motion (staggered KPI entrance, count-up on $ tiles — TWR %
-  strings stay verbatim, chart cross-fade on range change, `AnimatePresence` route
-  transitions, all gated behind `prefers-reduced-motion`), sonner toasts
-  (save/delete/optimize + API errors), GrowthChart legend chips (toggle
-  benchmark/invested) + restyled tooltip, sidebar active accent + slide-in mobile
-  drawer (hamburger, backdrop, Escape/route close), responsive KPI grid + a11y
-  focus rings/aria-labels, gradient Login card. Migrated the app-shell's local
-  view-switch to real routes (`/ /optimize /compare /tracking`). Increment C (new
-  views, built to the given API contract): **Compare** (chip multi-select 2–3,
-  shared start + benchmark, one multi-line chart, side-by-side KPI columns, metrics
-  table per portfolio + benchmark) and **Tracking** (portfolio picker, stored
-  valuations vs dashed benchmark, "Refresh now" with rows-written toast + refetch,
-  honest contributions caption, first-refresh empty state). New deps:
-  framer-motion, sonner, @fontsource-variable/inter. Gates green: `npm run build`
-  (tsc) + `npm run lint`. Backend endpoints (`/api/compare`,
-  `/api/portfolios/{id}/valuations`, `/api/portfolios/{id}/refresh`) built in
-  parallel by backend-data.
+- _(nothing in flight)_
 
 ## Done
+
+- **✅ Web UI v2 — modern + dynamic, with Compare & Tracking** (agents built in
+  parallel worktrees; both branches independently code-reviewed, fixed, merged).
+  **Backend** (`feat/api-compare-tracking`, backend-data): `/api/compare` (globally
+  aligned shared window; per-portfolio saved schedules; `dropped` surfaced),
+  `GET /api/portfolios/{id}/valuations`, `POST .../refresh`; review fix landed at the
+  source in `jobs/refresh.py` (price-less holding no longer 500s — also fixes
+  Streamlit tracking). **Frontend** (`feat/web-modern-ui`, frontend-viz): Inter +
+  design tokens, skeleton shimmer loaders, Framer Motion (staggered entrances,
+  count-ups, cross-fades, route transitions; reduced-motion gated), sonner toasts,
+  chart legend chips (toggle benchmark/invested), mobile drawer (390px verified),
+  real routes `/compare` `/tracking` + the two new views; review fixes: honest
+  compare caption (each portfolio keeps its own contribution plan), stale-results
+  gating, deep-link login return. **Live validation caught + fixed a real bug:** a
+  portfolio holding its own benchmark (SPY vs SPY) crashed refresh/simulate via a
+  duplicated price column — deduped in `jobs/refresh.py` + `app/sim_runner.py` with
+  regression tests. **125 tests green**, ruff clean, `npm run build`+lint clean;
+  Playwright-verified (dashboard light/dark, skeletons, Compare, Tracking, mobile —
+  `docs/screenshots/web-*.png`). Streamlit `app/` untouched (verified).
 
 - **✅ Web UI (FastAPI + React) MVP — Google-Finance style** (built by the agent team,
   reviewed, merged). Isolated by directory (Streamlit `app/` untouched — verified):

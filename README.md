@@ -22,10 +22,13 @@ directory, both running independently:
 
 - **Streamlit** (`app/`) — the original, fastest to iterate.
 - **Web UI** (`api/` FastAPI + `web/` React) — a Google-Finance-style SPA with
-  light/dark themes and green/red charts. See [docs/WEB_UI.md](docs/WEB_UI.md).
+  light/dark themes, green/red charts, Framer-Motion dynamics (skeleton loaders,
+  count-ups, route transitions), a responsive mobile drawer, and Dashboard /
+  Optimize / **Compare** / **Tracking** views. See [docs/WEB_UI.md](docs/WEB_UI.md).
 
 ![Web dashboard — light](docs/screenshots/web-dashboard-light.png)
 ![Web dashboard — dark](docs/screenshots/web-dashboard-dark.png)
+![Web compare](docs/screenshots/web-compare.png)
 
 ## Project layout
 

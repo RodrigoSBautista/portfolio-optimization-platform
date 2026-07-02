@@ -94,3 +94,33 @@ def test_refresh_portfolio_aligns_histories_and_is_idempotent():
     assert again == 3
     assert len(repo.get_valuations(user.id, portfolio.id)) == 3
     session.close()
+
+
+def test_refresh_portfolio_holding_its_own_benchmark():
+    # Regression: a portfolio that HOLDS its benchmark (SPY vs SPY) used to build a
+    # duplicated column and crash with "Data must be 1-dimensional".
+    idx = pd.date_range("2020-01-02", periods=4, freq="D")
+    data = pd.DataFrame(
+        {"SPY": [100.0, 101.0, 102.0, 103.0], "AGG": [50.0, 50.5, 51.0, 51.5]},
+        index=idx,
+    )
+    engine = create_engine("sqlite://", future=True)
+    Base.metadata.create_all(engine)
+    session = make_session_factory(engine)()
+    repo = Repository(session)
+    user = repo.create_user("a", "h")
+    spec = PortfolioSpec(
+        name="p",
+        holdings=[Holding("SPY", 0.6), Holding("AGG", 0.4)],
+        benchmark_symbol="SPY",
+        contributions=[Contribution(LUMP_SUM, 1000.0)],
+    )
+    portfolio = repo.save_portfolio(user.id, spec)
+    service = PriceService(provider=_FakeProvider(data), cache=None)
+
+    written = refresh_portfolio(repo, service, user.id, portfolio.id, spec, date(2020, 1, 1))
+    vals = repo.get_valuations(user.id, portfolio.id)
+    assert written == 4 and len(vals) == 4
+    assert vals[0].market_value == 1000.0
+    assert vals[0].benchmark_value == 1000.0  # SPY benchmark with the same lump sum
+    session.close()

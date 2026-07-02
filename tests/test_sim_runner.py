@@ -65,6 +65,25 @@ def test_compare_portfolios_share_one_window():
     assert r1.invested == r2.invested == 1000.0
 
 
+def test_run_simulation_portfolio_holding_its_own_benchmark():
+    # Regression: holdings that include the benchmark (SPY vs SPY) used to duplicate
+    # the column and make the benchmark slice 2-D.
+    idx = pd.date_range("2020-01-02", periods=3, freq="D")
+    prices = pd.DataFrame(
+        {"SPY": [100.0, 101.0, 102.0], "AGG": [50.0, 50.0, 50.0]}, index=idx
+    )
+    spec = PortfolioSpec(
+        name="p",
+        holdings=[Holding("SPY", 0.5), Holding("AGG", 0.5)],
+        benchmark_symbol="SPY",
+        contributions=[Contribution(LUMP_SUM, 1000.0)],
+    )
+    res = run_simulation(spec, prices)
+    assert res.has_benchmark
+    assert res.benchmark_value.ndim == 1  # 1-D series, not a 2-D slice
+    assert res.benchmark_value.iloc[-1] == pytest.approx(1020.0)  # SPY +2%
+
+
 def test_format_metrics_keys():
     idx = pd.Series([1.0, 1.1, 1.2], index=pd.date_range("2020-01-01", periods=3))
     out = format_metrics(idx)

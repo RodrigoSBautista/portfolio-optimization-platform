@@ -49,6 +49,9 @@ def run_simulation(
     ``benchmark`` overrides ``spec.benchmark_symbol`` (used by Compare).
     """
     benchmark = (benchmark or spec.benchmark_symbol).upper()
+    # Duplicate column labels (e.g. a caller passing the benchmark twice) make
+    # single-ticker slices 2-D; keep the first occurrence of each column.
+    prices = prices.loc[:, ~prices.columns.duplicated()]
     symbols = sorted({h.symbol.upper() for h in spec.holdings})
     available = [s for s in symbols if s in prices.columns]
     dropped = [s for s in symbols if s not in prices.columns]
@@ -56,7 +59,9 @@ def run_simulation(
         raise SimError("None of the holdings returned price data.")
 
     has_benchmark = benchmark in prices.columns
-    cols = available + ([benchmark] if has_benchmark else [])
+    # Dedupe: when the benchmark is also a holding, appending it would duplicate the
+    # column and make aligned[[benchmark]] two-dimensional.
+    cols = list(dict.fromkeys(available + ([benchmark] if has_benchmark else [])))
     aligned = common_history(prices[cols])
     if aligned.empty:
         raise SimError("No overlapping price history across these tickers and the benchmark.")

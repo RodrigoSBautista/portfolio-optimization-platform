@@ -57,17 +57,24 @@ def refresh_portfolio(
     """Compute and upsert daily valuations for one portfolio. Returns rows written."""
     symbols = sorted({h.symbol.upper() for h in spec.holdings})
     benchmark = spec.benchmark_symbol.upper()
-    frame = prices.get_adjusted_close([*symbols, benchmark], start, end)
+    # Dedupe the request (the benchmark may also be a holding) and drop any duplicated
+    # columns the provider returns — duplicate labels make single-ticker slices 2-D.
+    tickers = list(dict.fromkeys([*symbols, benchmark]))
+    frame = prices.get_adjusted_close(tickers, start, end)
     if frame.empty:
         return 0
+    frame = frame.loc[:, ~frame.columns.duplicated()]
 
     available = [s for s in symbols if s in frame.columns]
     if benchmark not in frame.columns or not available:
         return 0
 
     # Align holdings + benchmark to one common window so both simulations share the
-    # same dates and contribution schedule (apples-to-apples).
-    aligned = common_history(frame[[*available, benchmark]])
+    # same dates and contribution schedule (apples-to-apples). Dedupe columns: when a
+    # portfolio HOLDS its own benchmark (e.g. SPY vs SPY), [*available, benchmark]
+    # repeats the ticker and aligned[[benchmark]] would come back 2-D.
+    cols = list(dict.fromkeys([*available, benchmark]))
+    aligned = common_history(frame[cols])
     if aligned.empty:
         return 0
 

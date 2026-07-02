@@ -45,3 +45,15 @@ app.include_router(compare_tracking.router)
 @app.get("/api/health", tags=["health"])
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/", include_in_schema=False)
+def root() -> dict[str, str]:
+    """Friendly pointer for anyone opening the API base URL in a browser."""
+    return {
+        "service": "Portfolio Platform API",
+        "hint": "This is the backend. The web app runs on the Vite dev server "
+        "(http://localhost:5173 — start it with `cd web && npm run dev`).",
+        "docs": "/docs",
+        "health": "/api/health",
+    }

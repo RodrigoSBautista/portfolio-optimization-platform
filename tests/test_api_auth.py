@@ -14,6 +14,14 @@ def client():
     teardown()
 
 
+def test_root_and_health_are_browsable(client):
+    # Opening the API base URL in a browser should explain itself, not 404.
+    root = client.get("/")
+    assert root.status_code == 200
+    assert "5173" in root.json()["hint"]
+    assert client.get("/api/health").json() == {"status": "ok"}
+
+
 def test_signup_then_login_returns_jwt(client):
     signup = client.post("/api/auth/signup", json={"username": "alice", "password": "password123"})
     assert signup.status_code == 200

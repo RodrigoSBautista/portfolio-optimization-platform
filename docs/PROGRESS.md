@@ -28,7 +28,26 @@ _Last updated: 2026-06-13_
 
 ## In progress
 
-- _(nothing in flight)_
+- **Branch `feat/web-modern-ui` — React web UI modernization + Compare/Tracking.**
+  Increment B (modernization): Inter variable font, refined Tailwind tokens
+  (radius/soft-shadows/shimmer), reusable `Skeleton`/`Card`/`EmptyState`/`CountUp`
+  primitives, framer-motion (staggered KPI entrance, count-up on $ tiles — TWR %
+  strings stay verbatim, chart cross-fade on range change, `AnimatePresence` route
+  transitions, all gated behind `prefers-reduced-motion`), sonner toasts
+  (save/delete/optimize + API errors), GrowthChart legend chips (toggle
+  benchmark/invested) + restyled tooltip, sidebar active accent + slide-in mobile
+  drawer (hamburger, backdrop, Escape/route close), responsive KPI grid + a11y
+  focus rings/aria-labels, gradient Login card. Migrated the app-shell's local
+  view-switch to real routes (`/ /optimize /compare /tracking`). Increment C (new
+  views, built to the given API contract): **Compare** (chip multi-select 2–3,
+  shared start + benchmark, one multi-line chart, side-by-side KPI columns, metrics
+  table per portfolio + benchmark) and **Tracking** (portfolio picker, stored
+  valuations vs dashed benchmark, "Refresh now" with rows-written toast + refetch,
+  honest contributions caption, first-refresh empty state). New deps:
+  framer-motion, sonner, @fontsource-variable/inter. Gates green: `npm run build`
+  (tsc) + `npm run lint`. Backend endpoints (`/api/compare`,
+  `/api/portfolios/{id}/valuations`, `/api/portfolios/{id}/refresh`) built in
+  parallel by backend-data.
 
 ## Done
 

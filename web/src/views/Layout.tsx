@@ -61,10 +61,6 @@ export function Layout() {
   const ctx: ShellContext = {
     portfolios,
     selected: active,
-    selectPortfolio: (p) => {
-      setSelected(p);
-      navigate("/");
-    },
     openNew,
     openNewSeeded,
     deletePortfolio: async (p) => {
@@ -82,7 +78,11 @@ export function Layout() {
   const sidebar = (
     <Sidebar
       selectedId={location.pathname === "/" ? (active?.id ?? null) : null}
-      onSelect={(p) => setSelected(p)}
+      onSelect={(p) => {
+        // Selecting a portfolio always shows it on the dashboard.
+        setSelected(p);
+        if (location.pathname !== "/") navigate("/");
+      }}
       onNew={openNew}
       onNavigate={() => setDrawerOpen(false)}
     />

@@ -6,7 +6,6 @@ import type { Portfolio } from "../api/types";
 export interface ShellContext {
   portfolios: Portfolio[];
   selected: Portfolio | null;
-  selectPortfolio: (p: Portfolio) => void;
   openNew: () => void;
   // Open the New-portfolio modal seeded from an optimization result.
   openNewSeeded: (weights: Record<string, number>, benchmark: string) => void;

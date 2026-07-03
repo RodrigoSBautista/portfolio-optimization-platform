@@ -4,12 +4,20 @@ import { api } from "./client";
 import type {
   CompareRequest,
   CompareResponse,
+  DiversificationRequest,
+  DiversificationResponse,
+  FrontierRequest,
+  FrontierResponse,
   OptimizeRequest,
   OptimizeResponse,
   Portfolio,
   PortfolioSpec,
+  ProjectRequest,
+  ProjectResponse,
   RefreshRequest,
   RefreshResponse,
+  RetirementRequest,
+  RetirementResponse,
   SimulateRequest,
   SimulateResponse,
   Ticker,
@@ -80,6 +88,33 @@ export async function refreshValuations(
 ): Promise<RefreshResponse> {
   const { data } = await api.post<RefreshResponse>(
     `/api/portfolios/${id}/refresh`,
+    req,
+  );
+  return data;
+}
+
+export async function project(req: ProjectRequest): Promise<ProjectResponse> {
+  const { data } = await api.post<ProjectResponse>("/api/project", req);
+  return data;
+}
+
+export async function retirement(
+  req: RetirementRequest,
+): Promise<RetirementResponse> {
+  const { data } = await api.post<RetirementResponse>("/api/retirement", req);
+  return data;
+}
+
+export async function frontier(req: FrontierRequest): Promise<FrontierResponse> {
+  const { data } = await api.post<FrontierResponse>("/api/frontier", req);
+  return data;
+}
+
+export async function diversification(
+  req: DiversificationRequest,
+): Promise<DiversificationResponse> {
+  const { data } = await api.post<DiversificationResponse>(
+    "/api/diversification",
     req,
   );
   return data;

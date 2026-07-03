@@ -10,11 +10,10 @@ interface Props {
 function divergingColor(v: number): string {
   const t = Math.max(-1, Math.min(1, v));
   if (t >= 0) {
-    // 0 -> neutral, 1 -> red
-    const r = 209 + (255 - 209) * (1 - t); // toward light at 0
+    // 0 -> neutral grey (209,209,209), 1 -> red (209,36,47)
     const g = 209 * (1 - t) + 36 * t;
     const b = 209 * (1 - t) + 47 * t;
-    return `rgb(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)})`;
+    return `rgb(209, ${Math.round(g)}, ${Math.round(b)})`;
   }
   // 0 -> neutral, -1 -> blue
   const a = -t;

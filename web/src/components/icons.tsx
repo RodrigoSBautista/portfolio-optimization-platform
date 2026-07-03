@@ -94,3 +94,35 @@ export function FolderIcon({ size = 40, className }: IconProps) {
     </svg>
   );
 }
+
+// Projection: a widening cone of outcomes (fan) rising to the right.
+export function ProjectionIcon({ size = 18, className }: IconProps) {
+  return (
+    <svg {...svgProps(size)} className={className}>
+      <path d="M3 12h3" />
+      <path d="M6 12L20 5" />
+      <path d="M6 12l14 7" />
+      <path d="M6 12l14 0" />
+    </svg>
+  );
+}
+
+// Retirement: a simple wallet / nest-egg mark.
+export function RetirementIcon({ size = 18, className }: IconProps) {
+  return (
+    <svg {...svgProps(size)} className={className}>
+      <path d="M3 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+      <path d="M16 11h3v4h-3a2 2 0 0 1 0-4z" />
+    </svg>
+  );
+}
+
+// Diversification: overlapping circles (spreading risk).
+export function DiversifyIcon({ size = 18, className }: IconProps) {
+  return (
+    <svg {...svgProps(size)} className={className}>
+      <circle cx="9" cy="9" r="5" />
+      <circle cx="15" cy="15" r="5" />
+    </svg>
+  );
+}

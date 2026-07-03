@@ -19,12 +19,22 @@ interface Props {
   // Sign of the return that drives the trend color (>= 0 green, < 0 red).
   trendSign: number;
   benchmarkLabel: string;
+  // Which value field to plot for the main area. Defaults to nominal "value";
+  // pass "real_value" to show inflation-adjusted "today's dollars".
+  valueKey?: "value" | "real_value";
+  valueLabel?: string;
 }
 
 // Large area growth chart: GREEN when the trend is >= 0, RED when < 0 (gradient
 // fill + matching stroke). Legend CHIPS above the chart toggle the benchmark and
 // the invested (cost-basis) series on/off.
-export function GrowthChart({ series, trendSign, benchmarkLabel }: Props) {
+export function GrowthChart({
+  series,
+  trendSign,
+  benchmarkLabel,
+  valueKey = "value",
+  valueLabel = "Value",
+}: Props) {
   const ct = useChartTheme();
   const color = trendColor(trendSign);
   const hasBenchmark = series.some((p) => p.benchmark != null);
@@ -38,7 +48,7 @@ export function GrowthChart({ series, trendSign, benchmarkLabel }: Props) {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap gap-2">
-        <LegendChip color={color} label="Value" active disabled />
+        <LegendChip color={color} label={valueLabel} active disabled />
         <LegendChip
           color={investedColor}
           label="Invested"
@@ -83,7 +93,7 @@ export function GrowthChart({ series, trendSign, benchmarkLabel }: Props) {
             content={
               <ChartTooltip
                 labels={{
-                  value: "Value",
+                  [valueKey]: valueLabel,
                   invested: "Invested",
                   benchmark: benchmarkLabel,
                 }}
@@ -113,7 +123,7 @@ export function GrowthChart({ series, trendSign, benchmarkLabel }: Props) {
           )}
           <Area
             type="monotone"
-            dataKey="value"
+            dataKey={valueKey}
             stroke={color}
             strokeWidth={2}
             fill={`url(#${gradId})`}

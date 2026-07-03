@@ -120,6 +120,99 @@ def test_rebalance_restores_target_weights():
     assert out["value"].iloc[2] == pytest.approx(1500.0)
 
 
+# --- escalation (annual contribution growth) ------------------------------------
+
+def test_escalation_grows_contribution_on_anniversary():
+    # Monthly $100 with 5%/yr escalation, flat $1 price over ~2 years.
+    # Year 1 contributes 100/mo; year 2 contributes 105/mo.
+    idx = pd.bdate_range("2021-01-01", "2022-12-31")
+    prices = pd.DataFrame({"AAPL": 1.0}, index=idx)
+    out = simulate_portfolio(
+        prices,
+        {"AAPL": 1.0},
+        recurring_amount=100.0,
+        recurring_freq="monthly",
+        escalation_pct=5.0,
+    )
+    invested = out["invested"]
+    # Per-contribution deltas: 0 -> first day baseline, then step-ups.
+    deltas = invested.diff().fillna(invested.iloc[0])
+    contributed = deltas[deltas > 0].round(6)
+    year1 = contributed[contributed.index < pd.Timestamp("2022-01-01")]
+    year2 = contributed[contributed.index >= pd.Timestamp("2022-01-01")]
+    # 12 contributions each year at $100 then $105.
+    assert len(year1) == 12
+    assert year1.tolist() == pytest.approx([100.0] * 12)
+    assert len(year2) == 12
+    assert year2.tolist() == pytest.approx([105.0] * 12)
+
+
+def test_escalation_zero_matches_no_escalation():
+    px = _prices({"AAPL": [10.0, 10.0, 10.0]})
+    base = simulate_portfolio(
+        px, {"AAPL": 1.0}, recurring_amount=100.0, recurring_freq="daily"
+    )
+    esc = simulate_portfolio(
+        px,
+        {"AAPL": 1.0},
+        recurring_amount=100.0,
+        recurring_freq="daily",
+        escalation_pct=0.0,
+    )
+    pd.testing.assert_frame_equal(base, esc)
+
+
+def test_escalation_rejects_negative():
+    px = _prices({"AAPL": [10.0, 10.0]})
+    with pytest.raises(ValueError, match="escalation_pct"):
+        simulate_portfolio(
+            px, {"AAPL": 1.0}, recurring_amount=100.0,
+            recurring_freq="daily", escalation_pct=-1.0,
+        )
+
+
+# --- advisory-fee drag ----------------------------------------------------------
+
+def test_fee_drag_decays_value_on_flat_prices():
+    # Flat prices, lump sum, 1%/yr advisory fee -> value decays at (1-fee)^(1/252)/day.
+    n = 10
+    px = _prices({"AAPL": [100.0] * n})
+    out = simulate_portfolio(px, {"AAPL": 1.0}, lump_sum=1000.0, annual_fee_pct=1.0)
+    daily = (1.0 - 0.01) ** (1.0 / 252)
+    # Day 0: fee step is skipped (no holdings yet), then the lump sum buys in at 1000.
+    # Each subsequent day the existing holdings decay by one daily fee factor.
+    expected = [1000.0 * daily**i for i in range(n)]
+    np.testing.assert_allclose(out["value"].tolist(), expected, rtol=1e-12)
+    # TWR index reflects the same steady decay (1.0 on day one, then daily^i).
+    np.testing.assert_allclose(
+        out["twr_index"].tolist(), [daily**i for i in range(n)], rtol=1e-12
+    )
+
+
+def test_fee_zero_matches_no_fee():
+    px = _prices({"AAPL": [10.0, 11.0, 12.0]})
+    base = simulate_portfolio(px, {"AAPL": 1.0}, lump_sum=1000.0)
+    with_fee = simulate_portfolio(px, {"AAPL": 1.0}, lump_sum=1000.0, annual_fee_pct=0.0)
+    pd.testing.assert_frame_equal(base, with_fee)
+
+
+def test_fee_rejects_out_of_range():
+    px = _prices({"AAPL": [10.0, 11.0]})
+    with pytest.raises(ValueError, match="annual_fee_pct"):
+        simulate_portfolio(px, {"AAPL": 1.0}, lump_sum=100.0, annual_fee_pct=100.0)
+    with pytest.raises(ValueError, match="annual_fee_pct"):
+        simulate_portfolio(px, {"AAPL": 1.0}, lump_sum=100.0, annual_fee_pct=-1.0)
+
+
+# --- backward-compatible defaults reproduce old behavior ------------------------
+
+def test_new_params_default_to_old_behavior():
+    px = _prices({"AAPL": [10.0, 11.0, 12.0]})
+    out = simulate_portfolio(px, {"AAPL": 1.0}, lump_sum=1000.0)
+    assert out["value"].tolist() == [1000.0, 1100.0, 1200.0]
+    np.testing.assert_allclose(out["twr_index"].tolist(), [1.0, 1.1, 1.2])
+
+
 # --- look-ahead safety ----------------------------------------------------------
 
 def test_future_prices_do_not_affect_past_values():

@@ -12,11 +12,11 @@ import { ChartSkeleton, KpiGridSkeleton, TableSkeleton } from "../components/Ske
 import { crossFade, staggerContainer } from "../lib/motion";
 import { CRISIS_PRESETS, RANGES, startForRange, type RangeKey } from "../lib/dates";
 import { formatCurrency, formatSignedCurrency, metricSign } from "../lib/format";
+import { AdvancedOptions } from "./dashboard/AdvancedOptions";
 import {
-  AdvancedOptions,
   DEFAULT_ADVANCED,
   type AdvancedSimOptions,
-} from "./dashboard/AdvancedOptions";
+} from "./dashboard/advanced-options";
 import { AnalyticsSection } from "./dashboard/AnalyticsSection";
 
 interface Props {

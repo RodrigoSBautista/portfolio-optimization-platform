@@ -5,7 +5,10 @@ import { BENCHMARK_INDICES } from "../lib/benchmarks";
 import {
   ChartIcon,
   CompareIcon,
+  DiversifyIcon,
   PlusIcon,
+  ProjectionIcon,
+  RetirementIcon,
   SparklesIcon,
   TrackIcon,
 } from "./icons";
@@ -22,7 +25,10 @@ interface Props {
 
 const NAV = [
   { to: "/", label: "Dashboard", icon: ChartIcon, end: true },
+  { to: "/projection", label: "Projection", icon: ProjectionIcon, end: false },
+  { to: "/retirement", label: "Retirement", icon: RetirementIcon, end: false },
   { to: "/optimize", label: "Optimize", icon: SparklesIcon, end: false },
+  { to: "/diversification", label: "Diversification", icon: DiversifyIcon, end: false },
   { to: "/compare", label: "Compare", icon: CompareIcon, end: false },
   { to: "/tracking", label: "Tracking", icon: TrackIcon, end: false },
 ] as const;

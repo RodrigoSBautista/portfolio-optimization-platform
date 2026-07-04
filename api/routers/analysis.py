@@ -31,7 +31,7 @@ from core.optimization import (
     equal_weight,
     select,
 )
-from core.portfolio import Holding, PortfolioSpec
+from core.portfolio import LUMP_SUM, Contribution, Holding, PortfolioSpec
 from data.prices import PriceService
 from data.provider import common_history
 
@@ -49,12 +49,18 @@ def _safe_float(value: float) -> float | None:
     return None if value is None or not math.isfinite(value) else float(value)
 
 
+# Nominal lump sum for the optimize growth comparison (mirrors the Streamlit page).
+# Without cash the simulation holds $0 forever: flat series and all-zero metrics.
+_COMPARISON_LUMP = 10_000.0
+
+
 def _spec_from_weights(name: str, weights: dict[str, float], benchmark: str) -> PortfolioSpec:
-    """Reuse a simulation's contribution flows; only the holdings/weights differ."""
+    """Build a comparable spec: given weights, a shared nominal lump sum, no DCA."""
     return PortfolioSpec(
         name=name,
         holdings=[Holding(sym, w) for sym, w in weights.items()],
         benchmark_symbol=benchmark,
+        contributions=[Contribution(LUMP_SUM, _COMPARISON_LUMP)],
     )
 
 

@@ -72,6 +72,14 @@ def test_optimize_allocate(client):
     assert {"date", "suggested", "equal_weight", "benchmark"} <= set(cp)
     assert "Equal weight" in data["metrics"]
     assert "SPY" in data["metrics"]
+    # VALUE assertions (regression: specs once carried no cash -> flat $0 series and
+    # all-zero metrics). The growth comparison must start at the nominal lump sum and
+    # actually move over the window.
+    assert cp["suggested"] == pytest.approx(10_000.0)
+    assert cp["equal_weight"] == pytest.approx(10_000.0)
+    last = data["comparison_series"][-1]
+    assert last["suggested"] > 0 and last["suggested"] != pytest.approx(10_000.0)
+    assert data["metrics"]["Equal weight"]["Total return"] != "0.0%"
 
 
 def test_optimize_select_then_allocate(client):

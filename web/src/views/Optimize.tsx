@@ -18,6 +18,7 @@ import { SparklesIcon } from "../components/icons";
 import { MetricsTable } from "../components/MetricsTable";
 import { ChartSkeleton, TableSkeleton } from "../components/Skeleton";
 import { TickerSearch } from "../components/TickerSearch";
+import { FrontierSection } from "./optimize/FrontierSection";
 
 interface Props {
   onSaveAsPortfolio: (weights: Record<string, number>, benchmark: string) => void;
@@ -78,6 +79,9 @@ export function Optimize({ onSaveAsPortfolio }: Props) {
   }
 
   const result = optimize.data;
+  // The lookback the displayed result actually ran with — the frontier must not
+  // silently refetch when the live slider moves after a run.
+  const resultLookback = optimize.variables?.lookback_years ?? lookback;
 
   return (
     <div className="flex flex-col gap-4 p-4 md:p-6">
@@ -305,6 +309,13 @@ export function Optimize({ onSaveAsPortfolio }: Props) {
                 <SectionHeader>Metrics</SectionHeader>
                 <MetricsTable metrics={result.metrics} />
               </Card>
+
+              <FrontierSection
+                tickers={result.selected}
+                suggested={result.suggested}
+                lookbackYears={resultLookback}
+                riskFreeRate={0.04}
+              />
             </>
           )}
         </div>

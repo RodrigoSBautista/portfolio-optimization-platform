@@ -28,7 +28,22 @@ _Last updated: 2026-06-13_
 
 ## In progress
 
-- _(nothing in flight)_
+- **Web analytics expansion** (`feat/web-analytics`, frontend-viz) — built against
+  the pinned API contract (endpoints may 404 until the backend lands; views are
+  loading/error-resilient). Awaiting the parallel backend endpoints + review/merge.
+  Touches only `web/`. `npm run build` (tsc) + `npm run lint` clean.
+  - **Dashboard**: Advanced options panel (rebalance / risk-free / escalation /
+    fee / inflation → today's-dollars view), crisis preset chips (Dot-com, GFC,
+    COVID, 2022) using the new `end` field, analytics section (drawdown +
+    rolling), all flowing into a spec-inclusive simulate query key.
+  - **New views**: Projection (`/projection`, fan chart + goal probability),
+    Retirement (`/retirement`, success rate + balance fan), Diversification
+    (`/diversification`, heatmap + clusters + risk-contribution bars).
+  - **Optimize**: efficient-frontier section (cloud + line + Equal-weight/
+    Suggested markers via `extra_points`).
+  - New charts: FanChart, DrawdownChart, RollingChart, FrontierChart,
+    CorrelationHeatmap, RiskContributionBar. Contract typed verbatim in
+    `web/src/api/types.ts` (+ endpoint wrappers + React Query hooks).
 
 ## Done
 

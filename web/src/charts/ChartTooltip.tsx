@@ -12,10 +12,14 @@ interface Props {
   label?: string;
   payload?: PayloadItem[];
   labels: Record<string, string>; // dataKey -> display label
+  // When true, only render payload items that have an entry in `labels`. Lets
+  // charts with helper/stacked series (e.g. the fan chart's band widths) hide
+  // those raw values from the tooltip.
+  labelledOnly?: boolean;
 }
 
 // A theme-aware tooltip shared by the growth and comparison charts.
-export function ChartTooltip({ active, label, payload, labels }: Props) {
+export function ChartTooltip({ active, label, payload, labels, labelledOnly }: Props) {
   const ct = useChartTheme();
   if (!active || !payload?.length) return null;
   return (
@@ -30,7 +34,7 @@ export function ChartTooltip({ active, label, payload, labels }: Props) {
       <div className="mb-1.5 font-semibold opacity-70">{label}</div>
       <div className="flex flex-col gap-1">
         {payload
-          .filter((p) => p.value != null)
+          .filter((p) => p.value != null && (!labelledOnly || labels[p.dataKey]))
           .map((p) => (
             <div key={p.dataKey} className="flex items-center gap-2">
               <span

@@ -6,9 +6,13 @@ import {
 import * as endpoints from "./endpoints";
 import type {
   CompareRequest,
+  DiversificationRequest,
+  FrontierRequest,
   OptimizeRequest,
   PortfolioSpec,
+  ProjectRequest,
   RefreshRequest,
+  RetirementRequest,
   SimulateRequest,
 } from "./types";
 
@@ -80,6 +84,43 @@ export function useValuations(id: number | null) {
     queryKey: id != null ? keys.valuations(id) : ["valuations", "none"],
     queryFn: () => endpoints.fetchValuations(id as number),
     enabled: id != null,
+  });
+}
+
+// Monte-Carlo projection (fan chart). Keyed by the full request so the picker,
+// years, goal, and advanced (paths/seed) changes re-fetch and cache.
+export function useProjection(req: ProjectRequest | null) {
+  return useQuery({
+    queryKey: ["project", req],
+    queryFn: () => endpoints.project(req as ProjectRequest),
+    enabled: !!req,
+  });
+}
+
+// Retirement withdrawal simulation. Keyed by the full request.
+export function useRetirement(req: RetirementRequest | null) {
+  return useQuery({
+    queryKey: ["retirement", req],
+    queryFn: () => endpoints.retirement(req as RetirementRequest),
+    enabled: !!req,
+  });
+}
+
+// Efficient-frontier cloud + line + markers. Keyed by the full request.
+export function useFrontier(req: FrontierRequest | null) {
+  return useQuery({
+    queryKey: ["frontier", req],
+    queryFn: () => endpoints.frontier(req as FrontierRequest),
+    enabled: !!req,
+  });
+}
+
+// Correlation / clustering / risk-contribution breakdown. Keyed by the full request.
+export function useDiversification(req: DiversificationRequest | null) {
+  return useQuery({
+    queryKey: ["diversification", req],
+    queryFn: () => endpoints.diversification(req as DiversificationRequest),
+    enabled: !!req,
   });
 }
 

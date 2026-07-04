@@ -169,9 +169,12 @@ def retirement(
         if wd.rate is None or wd.rate < 0:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="withdrawal.rate (annual %) is required for kind='rate'",
+                detail="withdrawal.rate (annual fraction, e.g. 0.04) is required "
+                "for kind='rate'",
             )
-        withdrawal, is_rate = float(wd.rate), True
+        # Wire contract: `rate` is an annual FRACTION (0.04 = 4%-rule); the core
+        # engine expects an annual PERCENT. Convert exactly once, here.
+        withdrawal, is_rate = float(wd.rate) * 100.0, True
     else:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,

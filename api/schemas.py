@@ -8,9 +8,16 @@ from __future__ import annotations
 
 from datetime import date
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from core.portfolio import PortfolioSpec
+
+
+def _validate_long_only(weights: dict[str, float] | None) -> dict[str, float] | None:
+    """Reject negative weights — this is a long-only project (matches core)."""
+    if weights is not None and any(w < 0 for w in weights.values()):
+        raise ValueError("weights must be non-negative (long-only)")
+    return weights
 
 # --- auth -----------------------------------------------------------------------
 
@@ -256,7 +263,9 @@ class ProjectResponse(BaseModel):
 class WithdrawalDTO(BaseModel):
     kind: str  # "fixed" | "rate"
     amount: float | None = None  # monthly $ when kind="fixed"
-    rate: float | None = None  # annual % when kind="rate"
+    # Annual FRACTION when kind="rate" (0.04 = the 4% rule). The route converts to
+    # the percent units the core engine expects — the wire contract is fractional.
+    rate: float | None = None
 
 
 class RetirementRequest(BaseModel):
@@ -283,6 +292,8 @@ class RetirementResponse(BaseModel):
 class ExtraPoint(BaseModel):
     label: str
     weights: dict[str, float]
+
+    _long_only = field_validator("weights")(_validate_long_only)
 
 
 class FrontierRequest(BaseModel):
@@ -318,6 +329,8 @@ class DiversificationRequest(BaseModel):
     tickers: list[str] = Field(min_length=2, max_length=30)
     lookback_years: int = Field(default=3, ge=1, le=50)
     weights: dict[str, float] | None = None
+
+    _long_only = field_validator("weights")(_validate_long_only)
 
 
 class CorrelationMatrix(BaseModel):

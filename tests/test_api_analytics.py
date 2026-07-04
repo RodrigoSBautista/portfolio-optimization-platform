@@ -189,11 +189,36 @@ def test_retirement_success_extremes(client):
 
 def test_retirement_rate_kind(client):
     headers = auth_headers(client, "ret_rate")
+    # `rate` is an annual FRACTION on the wire (0.04 = the 4% rule).
     body = {"spec": _spec(), "start_balance": 500000.0, "years": 20,
-            "withdrawal": {"kind": "rate", "rate": 4.0}, "n_paths": 300}
+            "withdrawal": {"kind": "rate", "rate": 0.04}, "n_paths": 300}
     resp = client.post("/api/retirement", json=body, headers=headers)
     assert resp.status_code == 200, resp.text
     assert 0.0 <= resp.json()["success_rate"] <= 1.0
+
+
+def test_retirement_rate_unit_is_fraction_not_percent(client):
+    """Pins the fraction->percent conversion at the API boundary (a 100x seam).
+
+    A 95%/yr withdrawal (rate=0.95) is unsustainable on any realistic return path,
+    so success must collapse to ~0; if the fraction were mis-read as 0.95 PERCENT,
+    success would be ~1.0. The converse leg (0.1%/yr) must succeed.
+    """
+    headers = auth_headers(client, "ret_units")
+    base = {"spec": _spec(), "start_balance": 100000.0, "years": 10,
+            "n_paths": 200, "seed": 7}
+
+    ruinous = client.post("/api/retirement", json={
+        **base, "withdrawal": {"kind": "rate", "rate": 0.95}}, headers=headers)
+    assert ruinous.status_code == 200, ruinous.text
+    body = ruinous.json()
+    assert body["success_rate"] < 0.05
+    assert body["years_lasted"]["p95"] < 10
+
+    trivial = client.post("/api/retirement", json={
+        **base, "withdrawal": {"kind": "rate", "rate": 0.001}}, headers=headers)
+    assert trivial.status_code == 200
+    assert trivial.json()["success_rate"] == 1.0
 
 
 def test_retirement_bad_withdrawal_is_422(client):

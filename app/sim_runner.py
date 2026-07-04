@@ -52,8 +52,10 @@ def run_simulation(
     is already globally aligned (the Compare page), every portfolio shares one window.
     ``benchmark`` overrides ``spec.benchmark_symbol`` (used by Compare). ``sim_overrides``
     merges extra ``simulate_portfolio`` kwargs (e.g. ``rebalance``, ``escalation_pct``,
-    ``annual_fee_pct``) on top of the spec's contribution kwargs — applied to both the
-    portfolio and the benchmark so they stay on identical flows.
+    ``annual_fee_pct``) on top of the spec's contribution kwargs. Cash-flow overrides
+    (escalation) apply to BOTH lines so flows stay identical; ``annual_fee_pct`` applies
+    to the PORTFOLIO only — the benchmark is an unadvised index, and the comparison is
+    exactly where the fee's cost should be visible.
     """
     benchmark = (benchmark or spec.benchmark_symbol).upper()
     # Duplicate column labels (e.g. a caller passing the benchmark twice) make
@@ -81,7 +83,9 @@ def run_simulation(
 
     benchmark_value = benchmark_index = None
     if has_benchmark:
-        bench_sim = simulate_portfolio(aligned[[benchmark]], {benchmark: 1.0}, **kwargs)
+        # Identical cash flows, but no advisory-fee drag on the index line.
+        bench_kwargs = {**kwargs, "annual_fee_pct": 0.0}
+        bench_sim = simulate_portfolio(aligned[[benchmark]], {benchmark: 1.0}, **bench_kwargs)
         benchmark_value = bench_sim["value"]
         benchmark_index = bench_sim["twr_index"]
 

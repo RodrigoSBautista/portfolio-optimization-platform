@@ -40,9 +40,11 @@ description: >-
   TWR numbers (they answer different questions and WILL contradict under DCA).
 
 ## Metrics
-- **Sharpe** = `(annualized_return − risk_free_rate) / annualized_vol`. The risk-free
-  rate is a parameter (project default: 4.0%/yr unless the caller overrides) — rf=0 is
-  NOT acceptable as a silent default in new code.
+- **Sharpe** = `(annualized_return − risk_free_rate) / annualized_vol`, computed as the
+  standard estimator: `mean(daily_excess) × 252 / (std(daily_excess) × √252)` with
+  `daily_excess = daily_return − rf/252` (arithmetic annualization in the numerator,
+  NOT compounded CAGR). The risk-free rate is a parameter (project default: 4.0%/yr
+  unless the caller overrides) — rf=0 is NOT acceptable as a silent default in new code.
 - **Sortino**: like Sharpe but denominator = downside deviation (std of negative daily
   returns only, annualized √252).
 - **Calmar** = annualized return / |max drawdown|.

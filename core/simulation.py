@@ -17,6 +17,9 @@ from collections.abc import Mapping
 import pandas as pd
 from pandas.tseries.frequencies import to_offset
 
+# Trading days per year (annualization / daily fee-decay factor).
+TRADING_DAYS = 252
+
 # Friendly frequency names -> pandas date_range offset (period-start steps).
 # Supports plain N-month cadences (e.g. every 2 / 6 months) that to_period can't.
 _FREQ_OFFSETS = {
@@ -92,6 +95,8 @@ def simulate_portfolio(
     recurring_amount: float = 0.0,
     recurring_freq: str | None = None,
     rebalance: str | None = None,
+    escalation_pct: float = 0.0,
+    annual_fee_pct: float = 0.0,
 ) -> pd.DataFrame:
     """Simulate portfolio growth over the price history.
 
@@ -102,12 +107,26 @@ def simulate_portfolio(
         recurring_amount: cash invested each ``recurring_freq`` period.
         recurring_freq: e.g. "monthly", "weekly", "quarterly", or a pandas alias.
         rebalance: rebalance cadence (same vocabulary as ``recurring_freq``), or None.
+        escalation_pct: annual growth (as a percent, e.g. 5.0 -> 5%/yr) applied to the
+            recurring contribution amount on each anniversary of the first contribution
+            date. Year 1 contributes ``recurring_amount``; on/after the first
+            anniversary it contributes ``recurring_amount * (1 + e)``; after the second,
+            ``* (1 + e) ** 2``; etc. Look-ahead-safe (depends only on elapsed time).
+        annual_fee_pct: explicit advisory-fee drag (as a percent, e.g. 1.0 -> 1%/yr)
+            applied as a daily multiplicative decay ``(1 - fee) ** (1/252)`` to the
+            portfolio value each trading day. NOTE: fund expense ratios are ALREADY
+            embedded in the dividend-adjusted prices — do NOT use this for those; it is
+            only for a user-supplied advisory fee on top of them.
 
     Returns:
         DataFrame indexed by date with columns ``value``, ``invested``, ``twr_index``.
     """
     if lump_sum < 0 or recurring_amount < 0:
         raise ValueError("contribution amounts must be non-negative")
+    if escalation_pct < 0:
+        raise ValueError("escalation_pct must be non-negative")
+    if not 0.0 <= annual_fee_pct < 100.0:
+        raise ValueError("annual_fee_pct must be in [0, 100)")
 
     weights = normalize_weights(weights, list(prices.columns))
     tickers = list(weights)
@@ -127,6 +146,12 @@ def simulate_portfolio(
         rebal_days = _contribution_dates(dates, rebalance)
         rebal_days.discard(dates[0])  # nothing to rebalance on day one
 
+    escalation = escalation_pct / 100.0
+    # First contribution date anchors the escalation anniversaries; None until reached.
+    first_contrib_date = min(contrib_days) if contrib_days else None
+    # Daily advisory-fee decay factor (1.0 when no fee).
+    fee_daily = (1.0 - annual_fee_pct / 100.0) ** (1.0 / TRADING_DAYS)
+
     shares = pd.Series(0.0, index=tickers)
     invested = 0.0
     prev_value = 0.0
@@ -137,6 +162,10 @@ def simulate_portfolio(
     for i, day in enumerate(dates):
         price_today = px.loc[day]
 
+        # 0) advisory-fee drag: decay existing holdings BEFORE measuring returns/cash.
+        if fee_daily != 1.0 and (shares != 0.0).any():
+            shares = shares * fee_daily
+
         # 1) value of existing holdings BEFORE today's cash flow -> time-weighted factor
         value_before = float((shares * price_today).sum())
         twr_factors.append(value_before / prev_value if prev_value > 0 else 1.0)
@@ -144,7 +173,13 @@ def simulate_portfolio(
         # 2) contributions: lump sum on day one, recurring on period-start days
         cash = lump_sum if i == 0 else 0.0
         if day in contrib_days:
-            cash += recurring_amount
+            # Calendar anniversaries (not days // 365, which drifts across leap years).
+            years_elapsed = (
+                day.year
+                - first_contrib_date.year
+                - ((day.month, day.day) < (first_contrib_date.month, first_contrib_date.day))
+            )
+            cash += recurring_amount * (1.0 + escalation) ** years_elapsed
         if cash > 0:
             shares = shares + (cash * w) / price_today
             invested += cash

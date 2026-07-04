@@ -173,7 +173,12 @@ def simulate_portfolio(
         # 2) contributions: lump sum on day one, recurring on period-start days
         cash = lump_sum if i == 0 else 0.0
         if day in contrib_days:
-            years_elapsed = (day - first_contrib_date).days // 365
+            # Calendar anniversaries (not days // 365, which drifts across leap years).
+            years_elapsed = (
+                day.year
+                - first_contrib_date.year
+                - ((day.month, day.day) < (first_contrib_date.month, first_contrib_date.day))
+            )
             cash += recurring_amount * (1.0 + escalation) ** years_elapsed
         if cash > 0:
             shares = shares + (cash * w) / price_today

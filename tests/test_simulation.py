@@ -231,3 +231,19 @@ def test_empty_overlap_raises():
     )
     with pytest.raises(ValueError, match="no overlapping price history"):
         simulate_portfolio(px, {"AAPL": 0.5, "MSFT": 0.5}, lump_sum=100.0)
+
+
+def test_escalation_anniversary_is_calendar_based_across_leap_year():
+    # Leap year 2024: day 365 is Dec 31 — under a days//365 rule it would escalate a
+    # day early. The anniversary must be calendar-based (Jan 1, 2025).
+    idx = pd.bdate_range("2024-01-01", "2025-01-03")
+    prices = pd.DataFrame({"AAPL": 1.0}, index=idx)
+    out = simulate_portfolio(
+        prices, {"AAPL": 1.0}, recurring_amount=100.0, recurring_freq="daily",
+        escalation_pct=100.0,
+    )
+    invested = out["invested"]
+    on_dec31 = invested.loc["2024-12-31"] - invested.loc["2024-12-30"]
+    on_jan1 = invested.loc["2025-01-01"] - invested.loc["2024-12-31"]
+    assert on_dec31 == pytest.approx(100.0)  # still year 0 on Dec 31
+    assert on_jan1 == pytest.approx(200.0)  # doubles on the calendar anniversary

@@ -212,3 +212,11 @@ def test_empty_returns_raises():
 def test_module_exposes_caveat_constant():
     assert isinstance(projection.PROJECTION_CAVEAT, str)
     assert len(projection.PROJECTION_CAVEAT) > 0
+
+
+def test_bootstrap_survives_total_loss_datapoint():
+    # A bad-data row of -100% must not poison the bands with NaN (clipped just above -1).
+    rets = _sample_returns().copy()
+    rets.iloc[50] = -1.0
+    res = project_monte_carlo(rets, years=1, n_paths=20, start_value=1_000.0, seed=7)
+    assert np.isfinite(res.bands.to_numpy()).all()

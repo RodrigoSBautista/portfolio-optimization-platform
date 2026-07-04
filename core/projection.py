@@ -49,6 +49,9 @@ def _bootstrap_daily_paths(
     r = returns.dropna().to_numpy(dtype=float)
     if r.size == 0:
         raise ValueError("returns series is empty after dropping NaNs")
+    # Guard against bad-data rows: a return <= -100% would zero the cumulative path
+    # and poison every percentile with NaN (0/0). Clip just above total loss.
+    r = np.clip(r, -0.9999, None)
     block_size = max(1, min(block_size, r.size))
     n_blocks_available = r.size - block_size + 1  # overlapping moving blocks
 
@@ -217,7 +220,9 @@ class WithdrawalResult:
     """Result of :func:`simulate_withdrawals`.
 
     Attributes:
-        success_rate: share of paths whose balance never hit zero over the horizon.
+        success_rate: share of paths that funded every scheduled withdrawal over the
+            horizon (a path ending at exactly $0 after its final withdrawal counts
+            as a success).
         bands: monthly balance percentile bands (``p5..p95``) indexed by month.
         years_lasted_percentiles: dict pXX -> years the balance lasted (paths that
             survive the full horizon are recorded as ``years``).

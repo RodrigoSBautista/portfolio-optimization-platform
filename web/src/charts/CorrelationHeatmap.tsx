@@ -59,6 +59,7 @@ export function CorrelationHeatmap({ matrix }: Props) {
           <FragmentRow
             key={`row-${rowT}`}
             label={rowT}
+            columns={tickers}
             rowValues={values[i] ?? []}
           />
         ))}
@@ -82,9 +83,11 @@ export function CorrelationHeatmap({ matrix }: Props) {
 
 function FragmentRow({
   label,
+  columns,
   rowValues,
 }: {
   label: string;
+  columns: string[];
   rowValues: number[];
 }) {
   return (
@@ -97,7 +100,7 @@ function FragmentRow({
           key={j}
           className="flex items-center justify-center py-2 text-[11px] font-medium tabular-nums"
           style={{ background: divergingColor(v), color: textColor(v) }}
-          title={`${label} × col ${j + 1}: ${v.toFixed(2)}`}
+          title={`${label} × ${columns[j] ?? `col ${j + 1}`}: ${v.toFixed(2)}`}
         >
           {v.toFixed(2)}
         </div>

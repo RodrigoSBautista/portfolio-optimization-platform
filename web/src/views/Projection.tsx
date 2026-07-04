@@ -111,7 +111,10 @@ export function Projection() {
               value={effectiveStart ?? ""}
               min={0}
               placeholder={simLoading ? "Loading…" : "0"}
-              onChange={(e) => setStartValue(Number(e.target.value))}
+              onChange={(e) =>
+                // Empty input reverts to the auto-derived default (not $0).
+                setStartValue(e.target.value === "" ? null : Number(e.target.value))
+              }
               className="w-full rounded-md border border-edge bg-surface px-3 py-2 text-sm outline-none focus:border-brand dark:border-edge-dark dark:bg-surface-dark-alt"
             />
             <span className="mt-1 block text-xs text-content-muted dark:text-content-dark-muted">
@@ -222,10 +225,11 @@ export function Projection() {
             <>
               <CaveatBanner>{data.caveat}</CaveatBanner>
 
-              {data.goal_probability != null && (
+              {data.goal_probability != null && req?.goal != null && (
                 <Card className="p-5">
                   <p className="text-sm text-content-muted dark:text-content-dark-muted">
-                    Probability of reaching {formatCurrency(goal)} in {years} years
+                    {/* Label from the EXECUTED request, not live slider state. */}
+                    Probability of reaching {formatCurrency(req.goal)} in {req.years} years
                   </p>
                   <p className="mt-1 text-3xl font-semibold tabular-nums text-brand">
                     {Math.round(data.goal_probability * 100)}%

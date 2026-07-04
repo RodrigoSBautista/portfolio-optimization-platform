@@ -47,7 +47,9 @@ export function Retirement() {
         kind === "fixed"
           ? { kind: "fixed", amount }
           : { kind: "rate", rate: ratePct / 100 },
-      inflation_pct: inflationPct,
+      // Inflation growth only applies to fixed-$ withdrawals; don't send a hidden
+      // value in rate mode (its slider isn't even visible there).
+      inflation_pct: kind === "fixed" ? inflationPct : undefined,
       n_paths: nPaths,
       seed,
       lookback_years: 10,
@@ -260,7 +262,8 @@ export function Retirement() {
             <>
               <CaveatBanner>{data.caveat}</CaveatBanner>
 
-              <SuccessRateCard rate={data.success_rate} years={years} />
+              {/* Label from the EXECUTED request, not live slider state. */}
+              <SuccessRateCard rate={data.success_rate} years={req?.years ?? years} />
 
               <Card className="p-3">
                 <SectionHeader>Projected balance over retirement</SectionHeader>

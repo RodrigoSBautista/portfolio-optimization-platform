@@ -172,8 +172,9 @@ export function Dashboard({ portfolio, onDelete }: Props) {
         <>
           {inflationView && (
             <div className="rounded-lg border border-edge bg-surface-alt px-3 py-2 text-xs text-content-muted dark:border-edge-dark dark:bg-surface-dark-alt dark:text-content-dark-muted">
-              Chart and final value shown in <strong>today&apos;s dollars</strong>{" "}
-              (adjusted for {adv.inflationPct}%/yr inflation).
+              Portfolio value line and final value shown in{" "}
+              <strong>today&apos;s dollars</strong> (adjusted for {adv.inflationPct}%/yr
+              inflation). Benchmark and invested lines remain nominal.
             </div>
           )}
           <Card className="p-3">

@@ -13,7 +13,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.deps import get_session_factory
-from api.routers import analysis, auth, compare_tracking, portfolios
+from api.routers import analysis, analytics, auth, compare_tracking, portfolios
 
 ALLOWED_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]
 
@@ -39,6 +39,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(portfolios.router)
 app.include_router(analysis.router)
+app.include_router(analytics.router)
 app.include_router(compare_tracking.router)
 
 

@@ -40,13 +40,22 @@ class SimResult:
 
 
 def run_simulation(
-    spec: PortfolioSpec, prices: pd.DataFrame, benchmark: str | None = None
+    spec: PortfolioSpec,
+    prices: pd.DataFrame,
+    benchmark: str | None = None,
+    *,
+    sim_overrides: dict | None = None,
 ) -> SimResult:
     """Simulate ``spec`` over ``prices``; benchmark simulated with identical flows.
 
     Aligns holdings + benchmark to a common window (apples-to-apples). When ``prices``
     is already globally aligned (the Compare page), every portfolio shares one window.
-    ``benchmark`` overrides ``spec.benchmark_symbol`` (used by Compare).
+    ``benchmark`` overrides ``spec.benchmark_symbol`` (used by Compare). ``sim_overrides``
+    merges extra ``simulate_portfolio`` kwargs (e.g. ``rebalance``, ``escalation_pct``,
+    ``annual_fee_pct``) on top of the spec's contribution kwargs. Cash-flow overrides
+    (escalation) apply to BOTH lines so flows stay identical; ``annual_fee_pct`` applies
+    to the PORTFOLIO only — the benchmark is an unadvised index, and the comparison is
+    exactly where the fee's cost should be visible.
     """
     benchmark = (benchmark or spec.benchmark_symbol).upper()
     # Duplicate column labels (e.g. a caller passing the benchmark twice) make
@@ -68,24 +77,50 @@ def run_simulation(
 
     weights = {s: w for s, w in spec.weights().items() if s in available}
     kwargs = spec.simulation_kwargs()
+    if sim_overrides:
+        kwargs.update(sim_overrides)
     sim = simulate_portfolio(aligned[available], weights, **kwargs)
 
     benchmark_value = benchmark_index = None
     if has_benchmark:
-        bench_sim = simulate_portfolio(aligned[[benchmark]], {benchmark: 1.0}, **kwargs)
+        # Identical cash flows, but no advisory-fee drag on the index line.
+        bench_kwargs = {**kwargs, "annual_fee_pct": 0.0}
+        bench_sim = simulate_portfolio(aligned[[benchmark]], {benchmark: 1.0}, **bench_kwargs)
         benchmark_value = bench_sim["value"]
         benchmark_index = bench_sim["twr_index"]
 
     return SimResult(sim, benchmark_value, benchmark_index, dropped, benchmark, has_benchmark)
 
 
-def format_metrics(index: pd.Series) -> dict[str, str]:
-    """Human-readable metric bundle for a TWR return-index series."""
-    m = summarize(index)
-    return {
+def format_metrics(
+    index: pd.Series,
+    *,
+    risk_free_rate: float = 0.04,
+    benchmark_index: pd.Series | None = None,
+) -> dict[str, str]:
+    """Human-readable metric bundle for a TWR return-index series.
+
+    The original five rows are unchanged. The risk-adjusted extras (Sortino, Calmar,
+    Best/Worst calendar year) are always appended; Beta and annualized Alpha are added
+    only when a ``benchmark_index`` is supplied. ``risk_free_rate`` is an annual
+    fraction (e.g. 0.04 = 4%/yr) passed straight to ``summarize``.
+
+    Best/Worst year are **calendar-year** total returns — the first and last year may be
+    partial (they base on the series' opening/closing value).
+    """
+    m = summarize(index, risk_free_rate=risk_free_rate, benchmark_index=benchmark_index)
+    out = {
         "Total return": f"{m['total_return'] * 100:,.1f}%",
         "CAGR": f"{m['cagr'] * 100:,.1f}%",
         "Volatility (ann.)": f"{m['volatility'] * 100:,.1f}%",
         "Sharpe": f"{m['sharpe']:,.2f}",
         "Max drawdown": f"{m['max_drawdown'] * 100:,.1f}%",
+        "Sortino": f"{m['sortino']:,.2f}",
+        "Calmar": f"{m['calmar']:,.2f}",
+        "Best year": f"{m['best_year'] * 100:,.1f}%",
+        "Worst year": f"{m['worst_year'] * 100:,.1f}%",
     }
+    if benchmark_index is not None:
+        out["Beta"] = f"{m['beta']:,.2f}"
+        out["Alpha (ann.)"] = f"{m['alpha'] * 100:,.1f}%"
+    return out

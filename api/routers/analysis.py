@@ -14,13 +14,16 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from api.deps import get_current_user, get_price_service
 from api.schemas import (
     ComparisonPoint,
+    DrawdownPoint,
     OptimizeRequest,
     OptimizeResponse,
+    RollingPoint,
     SeriesPoint,
     SimulateRequest,
     SimulateResponse,
 )
 from app.sim_runner import SimError, format_metrics, run_simulation
+from core.metrics import deflate
 from core.optimization import (
     ALLOCATION_METHODS,
     SELECTION_METHODS,
@@ -33,6 +36,17 @@ from data.prices import PriceService
 from data.provider import common_history
 
 router = APIRouter(prefix="/api", tags=["analysis"])
+
+# Rebalance cadences the API contract exposes (subset of core's supported vocabulary).
+_REBALANCE_CADENCES = {"monthly", "quarterly", "annually"}
+_ROLLING_WINDOW = 252  # trading days for the 1-year rolling stats
+
+
+def _safe_float(value: float) -> float | None:
+    """None for NaN/inf so the response serializes to valid JSON (browser-parseable)."""
+    import math
+
+    return None if value is None or not math.isfinite(value) else float(value)
 
 
 def _spec_from_weights(name: str, weights: dict[str, float], benchmark: str) -> PortfolioSpec:
@@ -57,23 +71,44 @@ def simulate(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Portfolio has no holdings"
         )
+    if body.rebalance is not None and body.rebalance not in _REBALANCE_CADENCES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"rebalance must be one of {sorted(_REBALANCE_CADENCES)} or null",
+        )
 
-    prices = prices_svc.get_adjusted_close(symbols, body.start)
+    prices = prices_svc.get_adjusted_close(symbols, body.start, body.end)
     if prices.empty:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="No price data for the requested holdings and window",
         )
 
+    # Extra simulate kwargs: rebalance/escalation/fee (percent inputs go straight to
+    # simulate_portfolio, which interprets them as percents).
+    sim_overrides = {
+        "rebalance": body.rebalance,
+        "escalation_pct": body.escalation_pct,
+        "annual_fee_pct": body.annual_fee_pct,
+    }
     try:
-        result = run_simulation(spec, prices, benchmark)
-    except SimError as exc:
+        result = run_simulation(spec, prices, benchmark, sim_overrides=sim_overrides)
+    except (SimError, ValueError) as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
         ) from exc
 
     sim = result.sim
     bench = result.benchmark_value
+
+    # Real (inflation-adjusted) value series when inflation_pct is set. deflate() takes
+    # a PERCENT annual rate.
+    real_series = None
+    real_final_value = None
+    if body.inflation_pct is not None:
+        real_series = deflate(sim["value"], annual_inflation_pct=body.inflation_pct)
+        real_final_value = _safe_float(float(real_series.iloc[-1]))
+
     series: list[SeriesPoint] = []
     for ts, row in sim.iterrows():
         series.append(
@@ -82,12 +117,29 @@ def simulate(
                 value=float(row["value"]),
                 invested=float(row["invested"]),
                 benchmark=(float(bench.loc[ts]) if bench is not None else None),
+                real_value=(
+                    _safe_float(float(real_series.loc[ts])) if real_series is not None else None
+                ),
             )
         )
 
-    metrics: dict[str, dict[str, str]] = {spec.name: format_metrics(sim["twr_index"])}
+    # Portfolio metrics get beta/alpha when a benchmark is present; the benchmark's own
+    # metrics never carry beta/alpha (it would be beta-vs-itself).
+    metrics: dict[str, dict[str, str]] = {
+        spec.name: format_metrics(
+            sim["twr_index"],
+            risk_free_rate=body.risk_free_rate,
+            benchmark_index=(result.benchmark_index if result.has_benchmark else None),
+        )
+    }
     if result.has_benchmark and result.benchmark_index is not None:
-        metrics[result.benchmark] = format_metrics(result.benchmark_index)
+        metrics[result.benchmark] = format_metrics(
+            result.benchmark_index, risk_free_rate=body.risk_free_rate
+        )
+
+    drawdown = rolling = None
+    if body.include_analytics:
+        drawdown, rolling = _build_analytics(sim["twr_index"])
 
     invested = result.invested
     gain_pct = (result.final_value / invested - 1.0) * 100.0 if invested else 0.0
@@ -99,7 +151,29 @@ def simulate(
         gain_pct=gain_pct,
         dropped=result.dropped,
         benchmark=result.benchmark,
+        real_final_value=real_final_value,
+        drawdown=drawdown,
+        rolling=rolling,
     )
+
+
+def _build_analytics(twr_index) -> tuple[list[DrawdownPoint], list[RollingPoint]]:
+    """Drawdown curve + 252-day rolling return/vol from a TWR return-index series."""
+    dd = twr_index / twr_index.cummax() - 1.0
+    drawdown = [DrawdownPoint(date=ts.date(), pct=float(v)) for ts, v in dd.items()]
+
+    rets = twr_index.pct_change()
+    roll_ret = (1.0 + rets).rolling(_ROLLING_WINDOW).apply(lambda x: x.prod(), raw=True) - 1.0
+    roll_vol = rets.rolling(_ROLLING_WINDOW).std(ddof=1) * (_ROLLING_WINDOW ** 0.5)
+    rolling = [
+        RollingPoint(
+            date=ts.date(),
+            ret_1y=_safe_float(float(roll_ret.loc[ts])),
+            vol_1y=_safe_float(float(roll_vol.loc[ts])),
+        )
+        for ts in twr_index.index
+    ]
+    return drawdown, rolling
 
 
 @router.post("/optimize", response_model=OptimizeResponse)

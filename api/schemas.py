@@ -8,9 +8,16 @@ from __future__ import annotations
 
 from datetime import date
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from core.portfolio import PortfolioSpec
+
+
+def _validate_long_only(weights: dict[str, float] | None) -> dict[str, float] | None:
+    """Reject negative weights — this is a long-only project (matches core)."""
+    if weights is not None and any(w < 0 for w in weights.values()):
+        raise ValueError("weights must be non-negative (long-only)")
+    return weights
 
 # --- auth -----------------------------------------------------------------------
 
@@ -82,6 +89,14 @@ class SimulateRequest(BaseModel):
     spec: PortfolioSpecDTO
     start: date
     benchmark: str | None = None
+    # New optional analytics fields (all backward-compatible defaults).
+    end: date | None = None  # window end (YYYY-MM-DD) so crisis windows work
+    rebalance: str | None = None  # "monthly" | "quarterly" | "annually" | None
+    risk_free_rate: float = 0.04  # FRACTION (0.04 = 4%/yr) for Sharpe/Sortino
+    inflation_pct: float | None = None  # PERCENT (2.5 = 2.5%/yr); enables real values
+    escalation_pct: float = 0.0  # PERCENT annual growth of the recurring contribution
+    annual_fee_pct: float = 0.0  # PERCENT advisory-fee drag
+    include_analytics: bool = False  # attach drawdown + rolling series
 
 
 class SeriesPoint(BaseModel):
@@ -89,6 +104,18 @@ class SeriesPoint(BaseModel):
     value: float
     invested: float
     benchmark: float | None = None
+    real_value: float | None = None  # inflation-adjusted value (null unless requested)
+
+
+class DrawdownPoint(BaseModel):
+    date: date
+    pct: float  # twr_index/cummax - 1 (<= 0)
+
+
+class RollingPoint(BaseModel):
+    date: date
+    ret_1y: float | None = None  # 252-day compounded return (null until window fills)
+    vol_1y: float | None = None  # annualized vol of 252-day daily returns
 
 
 class SimulateResponse(BaseModel):
@@ -99,6 +126,9 @@ class SimulateResponse(BaseModel):
     gain_pct: float
     dropped: list[str]
     benchmark: str
+    real_final_value: float | None = None  # null unless inflation_pct set
+    drawdown: list[DrawdownPoint] | None = None  # null unless include_analytics
+    rolling: list[RollingPoint] | None = None  # null unless include_analytics
 
 
 # --- optimize -------------------------------------------------------------------
@@ -182,3 +212,143 @@ class RefreshRequest(BaseModel):
 
 class RefreshResponse(BaseModel):
     written: int
+
+
+# --- project (Monte Carlo accumulation) -----------------------------------------
+
+
+class ProjectRequest(BaseModel):
+    spec: PortfolioSpecDTO
+    years: int = Field(ge=1, le=50)
+    n_paths: int = Field(default=1000, ge=1, le=5000)
+    seed: int = 42
+    goal: float | None = None
+    start_value: float = Field(gt=0)
+    lookback_years: int = Field(default=10, ge=1, le=50)
+
+
+class ProjectBandPoint(BaseModel):
+    date: str  # "YYYY-MM"
+    p5: float
+    p25: float
+    p50: float
+    p75: float
+    p95: float
+
+
+class TerminalPercentiles(BaseModel):
+    p5: float
+    p25: float
+    p50: float
+    p75: float
+    p95: float
+
+
+class ContributedPoint(BaseModel):
+    date: str  # "YYYY-MM"
+    value: float  # cumulative money in, including the starting balance
+
+
+class ProjectResponse(BaseModel):
+    bands: list[ProjectBandPoint]
+    terminal: TerminalPercentiles
+    contributed: list[ContributedPoint]
+    goal_probability: float | None = None
+    caveat: str
+
+
+# --- retirement (withdrawal / drawdown) -----------------------------------------
+
+
+class WithdrawalDTO(BaseModel):
+    kind: str  # "fixed" | "rate"
+    amount: float | None = None  # monthly $ when kind="fixed"
+    # Annual FRACTION when kind="rate" (0.04 = the 4% rule). The route converts to
+    # the percent units the core engine expects — the wire contract is fractional.
+    rate: float | None = None
+
+
+class RetirementRequest(BaseModel):
+    spec: PortfolioSpecDTO
+    start_balance: float = Field(gt=0)
+    years: int = Field(ge=1, le=60)
+    withdrawal: WithdrawalDTO
+    inflation_pct: float = 2.5
+    n_paths: int = Field(default=1000, ge=1, le=5000)
+    seed: int = 42
+    lookback_years: int = Field(default=10, ge=1, le=50)
+
+
+class RetirementResponse(BaseModel):
+    success_rate: float
+    bands: list[ProjectBandPoint]
+    years_lasted: TerminalPercentiles
+    caveat: str
+
+
+# --- frontier (efficient frontier cloud) ----------------------------------------
+
+
+class ExtraPoint(BaseModel):
+    label: str
+    weights: dict[str, float]
+
+    _long_only = field_validator("weights")(_validate_long_only)
+
+
+class FrontierRequest(BaseModel):
+    tickers: list[str] = Field(min_length=2, max_length=30)
+    lookback_years: int = Field(default=3, ge=1, le=50)
+    n_samples: int = Field(default=2000, ge=1, le=5000)
+    seed: int = 42
+    risk_free_rate: float = 0.04
+    extra_points: list[ExtraPoint] = Field(default_factory=list)
+
+
+class RiskReturnPoint(BaseModel):
+    vol: float
+    ret: float
+
+
+class FrontierMarker(BaseModel):
+    label: str
+    vol: float
+    ret: float
+
+
+class FrontierResponse(BaseModel):
+    cloud: list[RiskReturnPoint]
+    frontier: list[RiskReturnPoint]
+    markers: list[FrontierMarker]
+
+
+# --- diversification (correlation / clusters / risk) ----------------------------
+
+
+class DiversificationRequest(BaseModel):
+    tickers: list[str] = Field(min_length=2, max_length=30)
+    lookback_years: int = Field(default=3, ge=1, le=50)
+    weights: dict[str, float] | None = None
+
+    _long_only = field_validator("weights")(_validate_long_only)
+
+
+class CorrelationMatrix(BaseModel):
+    tickers: list[str]
+    values: list[list[float]]
+
+
+class ClusterOut(BaseModel):
+    label: str
+    members: list[str]
+
+
+class RiskContribution(BaseModel):
+    ticker: str
+    pct: float
+
+
+class DiversificationResponse(BaseModel):
+    matrix: CorrelationMatrix
+    clusters: list[ClusterOut]
+    risk_contributions: list[RiskContribution]

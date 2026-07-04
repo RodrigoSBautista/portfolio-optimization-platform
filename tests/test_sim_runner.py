@@ -87,4 +87,17 @@ def test_run_simulation_portfolio_holding_its_own_benchmark():
 def test_format_metrics_keys():
     idx = pd.Series([1.0, 1.1, 1.2], index=pd.date_range("2020-01-01", periods=3))
     out = format_metrics(idx)
-    assert set(out) == {"Total return", "CAGR", "Volatility (ann.)", "Sharpe", "Max drawdown"}
+    # Original five rows plus the always-appended risk-adjusted extras. Beta/Alpha only
+    # appear when a benchmark_index is supplied (not here).
+    assert set(out) == {
+        "Total return", "CAGR", "Volatility (ann.)", "Sharpe", "Max drawdown",
+        "Sortino", "Calmar", "Best year", "Worst year",
+    }
+    assert "Beta" not in out
+
+
+def test_format_metrics_adds_beta_alpha_with_benchmark():
+    idx = pd.Series([1.0, 1.05, 1.1, 1.2], index=pd.date_range("2020-01-01", periods=4))
+    bench = pd.Series([1.0, 1.02, 1.05, 1.08], index=idx.index)
+    out = format_metrics(idx, benchmark_index=bench)
+    assert {"Beta", "Alpha (ann.)"} <= set(out)

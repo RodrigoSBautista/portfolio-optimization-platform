@@ -66,13 +66,23 @@ UI, or seed a demo user with the existing `storage.Repository` against the same
 Login/signup (deep links survive the login round-trip) · sidebar of portfolios +
 benchmark indices with green/red sparklines · **dashboard** growth area chart
 (green/red, legend chips to toggle the benchmark/invested series) with time-range
-tabs + a KPI grid (all percentages time-weighted for consistency) + a
-metrics-vs-benchmark table · **new portfolio** (ticker search, weights or $-amounts,
-contributions) · **optimize** (allocate/select, suggested vs equal-weight) ·
-**compare** (2–3 saved portfolios on one chart over a shared window; each keeps its
-own saved contribution plan) · **tracking** (stored daily valuations vs benchmark +
-"Refresh now").
+tabs, **crisis-window presets** (Dot-com, 2008 GFC, COVID, 2022), an **advanced
+panel** (rebalance cadence, risk-free rate, contribution escalation, advisory fee,
+**inflation-adjusted "today's dollars"** mode) and an analytics section (drawdown +
+rolling 1-yr return/vol), + a KPI grid (all percentages time-weighted) + a
+metrics-vs-benchmark table (Sharpe/Sortino/Calmar/beta/alpha/best-worst year) ·
+**new portfolio** (ticker search, weights or $-amounts, contributions) ·
+**optimize** (allocate/select, suggested vs equal-weight, **efficient-frontier**
+cloud) · **projection** (Monte Carlo block-bootstrap **fan chart**, goal
+probability, honest caveats) · **retirement** ("will my money last" — success rate,
+balance bands, years-lasted percentiles) · **diversification** (correlation
+heatmap, clusters, risk contributions) · **compare** (2–3 saved portfolios on one
+chart over a shared window) · **tracking** (stored daily valuations + "Refresh now").
 
+![Projection](screenshots/web-projection.png)
+![Retirement](screenshots/web-retirement.png)
+![Dashboard analytics](screenshots/web-dashboard-analytics.png)
+![Diversification](screenshots/web-diversification.png)
 ![Compare](screenshots/web-compare.png)
 ![Tracking](screenshots/web-tracking.png)
 

@@ -4,15 +4,21 @@
 > interruption. Keep this current — see [WORKFLOW.md](WORKFLOW.md). Update the
 > **Next step** line so a cold start knows exactly what to do next.
 
-_Last updated: 2026-06-13_
+_Last updated: 2026-07-04_
 
 ## Next step (start here on resume)
 
-- **Web UI v2 is complete** (modern design system + Compare & Tracking in React).
-  Remaining for the **Final Phase (production)**: SQLite→**Supabase Postgres**
-  (Alembic — only `DATABASE_URL` changes), **GitHub Actions cron** for daily refresh,
-  auth hardening (refresh tokens), and **cloud deploy**. See `docs/PLAN.md` Final
-  Phase + [docs/WEB_UI.md](WEB_UI.md).
+- **Analytics push is complete** (Monte Carlo projection, retirement, frontier,
+  diversification, dashboard advanced options — all live-validated). Remaining for
+  the **Final Phase (production)**: SQLite→**Supabase Postgres** (Alembic — only
+  `DATABASE_URL` changes), **GitHub Actions cron** for daily refresh, auth hardening
+  (refresh tokens), and **cloud deploy**. See `docs/PLAN.md` Final Phase +
+  [docs/WEB_UI.md](WEB_UI.md).
+- **Analytics follow-ups (non-blocking, from reviews):** frontier request's unused
+  `risk_free_rate` (add a max-Sharpe marker or drop it); metric strings can render
+  "nan" on degenerate windows; Streamlit hasn't adopted the new core params
+  (rebalance/rf/inflation/escalation/fee) — port if wanted; Retirement toggle lacks
+  aria-pressed.
 - **Web-UI known follow-ups (non-blocking):** sidebar does one `/api/simulate` per row
   (N+1 live fetches — fine for a few portfolios; batch later); JWT in `localStorage`;
   focus trap in drawer/modal; route-level code-splitting (~900 kB JS chunk).
@@ -26,7 +32,30 @@ _Last updated: 2026-06-13_
   `uv run alembic upgrade head`). Refresh job: `uv run python -m jobs.refresh`.
 - **Remote (SSH):** `git@github.com:RodrigoSBautista/portfolio-optimization-platform.git`
 
-## In progress
+## Done (latest)
+
+- **✅ Analytics push — simulations upgraded end to end** (4 increments, every branch
+  independently reviewed before merge; 189+ tests green; ruff + web gates clean).
+  **Core** (quant-ml agent, math-reviewed with numerical probes): rf-aware Sharpe
+  (default 4%) + Sortino/Calmar/best-worst-year/beta/alpha + `deflate`; contribution
+  **escalation** (calendar anniversaries) + **advisory-fee drag** (portfolio only —
+  benchmark stays fee-free so the fee's cost is visible); `core/projection.py` —
+  block-bootstrap **Monte Carlo** (percentile bands, goal probability, seeded,
+  ~0.3 s per 1000 paths × 30 y) + **withdrawal simulator** (success rate,
+  years-lasted). **API** (backend agent): /simulate extensions (end/rebalance/rf/
+  inflation/escalation/fee/analytics), /project, /retirement, /frontier,
+  /diversification — review caught a **silent 100× unit seam** (retirement rate
+  fraction vs percent), fixed with discriminating value tests; response units pinned
+  as fractions. **React** (frontend agent): Projection fan chart + goal stat +
+  caveat banner, Retirement view, frontier scatter, diversification heatmap/
+  clusters/risk bars, dashboard crisis presets + advanced panel + today's-dollars
+  mode + drawdown/rolling. **Live validation** exposed + fixed a latent v1 bug:
+  optimize comparison specs carried no cash (flat $0 series, all-zero metrics) —
+  now a $10k lump + value-locked tests. Screenshots:
+  `docs/screenshots/web-{projection,retirement,diversification,optimize-frontier,dashboard-analytics}.png`.
+  Also new: `finance-conventions` Skill + quant charter v2 (statistical rigor).
+
+## In progress (superseded by the entry above — kept for the record)
 
 - **Web analytics expansion** (`feat/web-analytics`, frontend-viz) — built against
   the pinned API contract (endpoints may 404 until the backend lands; views are

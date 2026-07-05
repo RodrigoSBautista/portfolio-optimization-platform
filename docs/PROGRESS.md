@@ -4,10 +4,15 @@
 > interruption. Keep this current — see [WORKFLOW.md](WORKFLOW.md). Update the
 > **Next step** line so a cold start knows exactly what to do next.
 
-_Last updated: 2026-07-04_
+_Last updated: 2026-07-05_
 
 ## Next step (start here on resume)
 
+- **Dated-purchase (lot-based) portfolios are complete** — core engine + storage +
+  API + React UI all merged to `main`, gates green (~220 tests, ruff clean, web
+  build+lint clean), and **live-validated** (buy-date markers on the growth chart +
+  the "Actual purchases (dates)" entry form — see
+  `docs/screenshots/web-lots-dashboard.png` / `web-lots-form.png`).
 - **Analytics push is complete** (Monte Carlo projection, retirement, frontier,
   diversification, dashboard advanced options — all live-validated). Remaining for
   the **Final Phase (production)**: SQLite→**Supabase Postgres** (Alembic — only
@@ -34,19 +39,31 @@ _Last updated: 2026-07-04_
 
 ## Done (latest)
 
-- **✅ Lot-based persistence + API (`feat/api-lots`)** — dated-purchase portfolios
-  now persist and flow through the REST layer end to end (219 tests green; ruff clean).
-  **Storage:** `LotRow` model + `Portfolio.lots` (delete-orphan cascade), Alembic
-  migration `5cbf39db2a2f` (up/down round-trip verified on scratch SQLite);
-  `repository.save_portfolio` replaces lots on update, `portfolio_io.orm_to_spec` and
-  JSON export/import restore them (spec v2). **sim_runner:** lot branch in
-  `run_simulation` (`simulate_lots_detailed` + mirror-lot benchmark with identical
-  dollars/dates; rejects fee/rebalance/escalation overrides as `SimError`; weighted
-  path unchanged). **API:** `LotDTO` + `PortfolioSpecDTO.lots`, `BuyMarker` +
-  `SimulateResponse.buy_markers`; `/api/simulate` lot mode ignores `start`, fetches
-  from `min(lot.date)`, 422s the inapplicable knobs, returns snapped buy markers;
-  portfolios CRUD + compare carry lots. **jobs/refresh:** lot branch (mirror benchmark,
-  idempotent upsert).
+- **✅ Dated-purchase (lot-based) portfolios — end to end, merged to `main` &
+  live-validated.** Users can now evaluate a portfolio they actually built over time:
+  each buy is entered as ticker + date + dollars, the simulation replays the true
+  cash-flow history, the benchmark receives identical dollars on the same dates, and
+  the growth chart marks every buy date. ~220 tests green; ruff clean; web build+lint
+  clean.
+  - **Core engine** (quant-ml, math-reviewed): `Lot` dataclass + `PortfolioSpec.lots`
+    / `is_lot_based` (spec v2); `simulate_lots_detailed` on a **union calendar** (each
+    symbol ffilled independently so late-listing symbols don't truncate the window,
+    anchored at the earliest *placed* buy). Review fix: a **delisted** symbol is bounded
+    at its own last quote (contributes 0 after), preventing phantom value + inflated TWR.
+  - **Storage:** `LotRow` + `Portfolio.lots` (delete-orphan cascade), Alembic migration
+    `5cbf39db2a2f` (up/down round-trip verified); `save_portfolio` replaces lots on
+    update; `orm_to_spec` + JSON export/import restore them.
+  - **API:** `LotDTO` + `PortfolioSpecDTO.lots`, `BuyMarker` + `SimulateResponse.buy_markers`;
+    `/api/simulate` lot mode ignores `start`, fetches from `min(lot.date)`, 422s the
+    inapplicable knobs (rebalance/escalation/fee), returns forward-snapped buy markers;
+    portfolios CRUD + compare carry lots. `jobs/refresh` has a lot branch (mirror
+    benchmark, idempotent upsert). **Blocking review fix:** mirror-benchmark lot dates
+    clamp to `max(lot.date, benchmark_first_trading_day)` so a late-listing benchmark
+    can't silently drop an early lot's dollars (was faking outperformance).
+  - **Web UI** (frontend): New-Portfolio third input mode "Actual purchases (dates)"
+    (per-row ticker/date/amount); Dashboard hides range tabs/crisis chips for lot specs
+    and shows a "Since first purchase (…)" caption; `GrowthChart` draws purple buy-date
+    markers snapped to the value line.
 
 
 - **✅ Analytics push — simulations upgraded end to end** (4 increments, every branch

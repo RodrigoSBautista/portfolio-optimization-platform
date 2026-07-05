@@ -24,11 +24,15 @@ directory, both running independently:
 - **Web UI** (`api/` FastAPI + `web/` React) — a Google-Finance-style SPA with
   light/dark themes, green/red charts, Framer-Motion dynamics (skeleton loaders,
   count-ups, route transitions), a responsive mobile drawer, and Dashboard /
-  Optimize / **Compare** / **Tracking** views. See [docs/WEB_UI.md](docs/WEB_UI.md).
+  Optimize / **Compare** / **Tracking** / Projection / Retirement views, and
+  **dated-purchase portfolios** (enter each buy's ticker/date/dollars to evaluate a
+  real portfolio built over time — the chart marks every buy date and the benchmark
+  gets identical dollars on the same dates). See [docs/WEB_UI.md](docs/WEB_UI.md).
 
 ![Web dashboard — light](docs/screenshots/web-dashboard-light.png)
 ![Web dashboard — dark](docs/screenshots/web-dashboard-dark.png)
 ![Web compare](docs/screenshots/web-compare.png)
+![Dated purchases — buy-date markers](docs/screenshots/web-lots-dashboard.png)
 
 ## Project layout
 

@@ -71,7 +71,11 @@ panel** (rebalance cadence, risk-free rate, contribution escalation, advisory fe
 **inflation-adjusted "today's dollars"** mode) and an analytics section (drawdown +
 rolling 1-yr return/vol), + a KPI grid (all percentages time-weighted) + a
 metrics-vs-benchmark table (Sharpe/Sortino/Calmar/beta/alpha/best-worst year) ·
-**new portfolio** (ticker search, weights or $-amounts, contributions) ·
+**new portfolio** (ticker search; three input modes: weights, $-amounts, or
+**actual dated purchases** — enter each buy's ticker/date/dollars, so real
+portfolios built over time are evaluated with their true entry timing; the growth
+chart marks each **buy date** and the benchmark receives identical dollars on the
+same dates for an honest comparison) ·
 **optimize** (allocate/select, suggested vs equal-weight, **efficient-frontier**
 cloud) · **projection** (Monte Carlo block-bootstrap **fan chart**, goal
 probability, honest caveats) · **retirement** ("will my money last" — success rate,
@@ -79,6 +83,8 @@ balance bands, years-lasted percentiles) · **diversification** (correlation
 heatmap, clusters, risk contributions) · **compare** (2–3 saved portfolios on one
 chart over a shared window) · **tracking** (stored daily valuations + "Refresh now").
 
+![Dated purchases — buy-date markers on the growth chart](screenshots/web-lots-dashboard.png)
+![Actual-purchases entry form](screenshots/web-lots-form.png)
 ![Projection](screenshots/web-projection.png)
 ![Retirement](screenshots/web-retirement.png)
 ![Dashboard analytics](screenshots/web-dashboard-analytics.png)

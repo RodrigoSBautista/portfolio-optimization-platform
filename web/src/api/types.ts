@@ -30,12 +30,27 @@ export interface Contribution {
   end_date?: string | null;
 }
 
+// One actual historical purchase: a fixed dollar amount of `symbol` bought on
+// `date`. A portfolio is "lot-based" iff its `lots` array is non-empty; such
+// specs describe an existing portfolio whose entry timing (per-stock buy dates)
+// drives its real performance.
+export interface Lot {
+  symbol: string;
+  date: string; // YYYY-MM-DD
+  amount: number; // dollars invested at that date
+}
+
 export interface PortfolioSpec {
   name: string;
   benchmark_symbol: string;
   base_currency: string;
   holdings: Holding[];
   contributions: Contribution[];
+  // Optional. When non-empty the portfolio is lot-based: `holdings` and
+  // `contributions` may be empty and the backend derives the position + window
+  // from these purchases (window = earliest purchase → today; `end` honored,
+  // `start`/`rebalance`/`escalation_pct` ignored/rejected).
+  lots?: Lot[];
 }
 
 export interface Portfolio extends PortfolioSpec {
@@ -85,6 +100,14 @@ export interface RollingPoint {
   vol_1y: number | null;
 }
 
+// A purchase snapped to the trading date the backend actually used to price it.
+// Present (per lot) for lot-based specs so the UI can mark buy dates on the chart.
+export interface BuyMarker {
+  date: string; // YYYY-MM-DD (snapped trading date)
+  symbol: string;
+  amount: number;
+}
+
 export interface SimulateResponse {
   series: SeriesPoint[];
   metrics: Metrics;
@@ -98,6 +121,8 @@ export interface SimulateResponse {
   // Present when the request set `include_analytics`.
   drawdown?: DrawdownPoint[];
   rolling?: RollingPoint[];
+  // Present for lot-based specs: the snapped trading date of each purchase.
+  buy_markers?: BuyMarker[] | null;
 }
 
 export type OptimizeMode = "allocate" | "select";

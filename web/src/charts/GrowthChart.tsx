@@ -1,18 +1,26 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Area,
   ComposedChart,
   Line,
+  ReferenceDot,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
-import type { SeriesPoint } from "../api/types";
+import type { BuyMarker, SeriesPoint } from "../api/types";
 import { formatCurrency } from "../lib/format";
 import { trendColor } from "../theme/colors";
 import { useChartTheme } from "../theme/useTheme";
 import { ChartTooltip } from "./ChartTooltip";
+
+// Buy-date markers use purple — a categorical accent that avoids the chart's
+// green/red return semantics, the blue "invested" line, and the gray benchmark.
+const MARKER_COLOR = "#9334e6";
+// Above this many markers we keep the dots but drop the per-dot text labels to
+// avoid clutter (the amount/symbol is still in each dot's hover tooltip).
+const MARKER_LABEL_LIMIT = 12;
 
 interface Props {
   series: SeriesPoint[];
@@ -23,6 +31,14 @@ interface Props {
   // pass "real_value" to show inflation-adjusted "today's dollars".
   valueKey?: "value" | "real_value";
   valueLabel?: string;
+  // Lot-based specs only: dated purchases to mark on the value line.
+  buyMarkers?: BuyMarker[] | null;
+}
+
+interface MarkerDot {
+  date: string;
+  y: number;
+  entries: BuyMarker[];
 }
 
 // Large area growth chart: GREEN when the trend is >= 0, RED when < 0 (gradient
@@ -34,6 +50,7 @@ export function GrowthChart({
   benchmarkLabel,
   valueKey = "value",
   valueLabel = "Value",
+  buyMarkers,
 }: Props) {
   const ct = useChartTheme();
   const color = trendColor(trendSign);
@@ -44,6 +61,32 @@ export function GrowthChart({
   const [showInvested, setShowInvested] = useState(false);
 
   const investedColor = "#1a73e8"; // brand blue
+
+  // Snap each purchase to its point on the plotted value line, grouping buys on
+  // the same date into one dot. Markers whose date isn't in the plotted window
+  // are dropped (keeps the overlay honest).
+  const markerDots = useMemo<MarkerDot[]>(() => {
+    if (!buyMarkers?.length) return [];
+    const valueByDate = new Map<string, number>();
+    for (const p of series) {
+      const v = p[valueKey];
+      if (v != null) valueByDate.set(p.date, v);
+    }
+    const byDate = new Map<string, BuyMarker[]>();
+    for (const m of buyMarkers) {
+      const arr = byDate.get(m.date);
+      if (arr) arr.push(m);
+      else byDate.set(m.date, [m]);
+    }
+    const dots: MarkerDot[] = [];
+    for (const [date, entries] of byDate) {
+      const y = valueByDate.get(date);
+      if (y != null) dots.push({ date, y, entries });
+    }
+    return dots;
+  }, [buyMarkers, series, valueKey]);
+
+  const showMarkerLabels = markerDots.length <= MARKER_LABEL_LIMIT;
 
   return (
     <div className="flex flex-col gap-3">
@@ -63,6 +106,9 @@ export function GrowthChart({
             active={showBenchmark}
             onClick={() => setShowBenchmark((v) => !v)}
           />
+        )}
+        {markerDots.length > 0 && (
+          <LegendChip color={MARKER_COLOR} label="Purchases" active disabled />
         )}
       </div>
 
@@ -130,6 +176,51 @@ export function GrowthChart({
             dot={false}
             isAnimationActive={false}
           />
+          {markerDots.map((d) => {
+            const title =
+              "Bought " +
+              d.entries
+                .map((e) => `${formatCurrency(e.amount)} of ${e.symbol}`)
+                .join(", ");
+            const symbols = [...new Set(d.entries.map((e) => e.symbol))].join("+");
+            return (
+              <ReferenceDot
+                key={d.date}
+                x={d.date}
+                y={d.y}
+                ifOverflow="extendDomain"
+                // Native SVG <title> gives a no-JS, reduced-motion-safe hover
+                // tooltip ("Bought $2,000 of NVDA").
+                shape={(props) =>
+                  props.cx == null || props.cy == null ? (
+                    <circle r={0} />
+                  ) : (
+                    <circle
+                      cx={props.cx}
+                      cy={props.cy}
+                      r={5}
+                      fill={MARKER_COLOR}
+                      stroke="#fff"
+                      strokeWidth={1.5}
+                    >
+                      <title>{title}</title>
+                    </circle>
+                  )
+                }
+                label={
+                  showMarkerLabels
+                    ? {
+                        value: symbols,
+                        position: "top",
+                        fill: MARKER_COLOR,
+                        fontSize: 10,
+                        fontWeight: 600,
+                      }
+                    : undefined
+                }
+              />
+            );
+          })}
         </ComposedChart>
       </ResponsiveContainer>
     </div>

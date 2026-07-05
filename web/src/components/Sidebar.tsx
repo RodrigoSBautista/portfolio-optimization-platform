@@ -2,6 +2,7 @@ import { NavLink } from "react-router-dom";
 import { usePortfolios } from "../api/queries";
 import type { Portfolio } from "../api/types";
 import { BENCHMARK_INDICES } from "../lib/benchmarks";
+import { isLotBased } from "../lib/lots";
 import {
   ChartIcon,
   CompareIcon,
@@ -94,7 +95,11 @@ export function Sidebar({ selectedId, onSelect, onNew, onNavigate }: Props) {
             key={p.id}
             id={p.id}
             label={p.name}
-            sublabel={`${p.holdings.length} holdings · vs ${p.benchmark_symbol}`}
+            sublabel={`${
+              isLotBased(p)
+                ? `${p.lots!.length} purchase${p.lots!.length === 1 ? "" : "s"}`
+                : `${p.holdings.length} holding${p.holdings.length === 1 ? "" : "s"}`
+            } · vs ${p.benchmark_symbol}`}
             spec={p}
             active={selectedId === p.id}
             onClick={() => {

@@ -4,9 +4,12 @@ import type { AdvancedSimOptions } from "./advanced-options";
 interface Props {
   value: AdvancedSimOptions;
   onChange: (next: AdvancedSimOptions) => void;
+  // Lot-based specs 422 on rebalance/escalation (fixed historical purchases), so
+  // hide those two controls; the rest (rf/inflation/fee) still apply.
+  lotBased?: boolean;
 }
 
-export function AdvancedOptions({ value, onChange }: Props) {
+export function AdvancedOptions({ value, onChange, lotBased = false }: Props) {
   const set = <K extends keyof AdvancedSimOptions>(
     key: K,
     v: AdvancedSimOptions[K],
@@ -15,20 +18,22 @@ export function AdvancedOptions({ value, onChange }: Props) {
   return (
     <Collapsible title="Advanced options">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <Field label="Rebalance">
-          <select
-            value={value.rebalance}
-            onChange={(e) =>
-              set("rebalance", e.target.value as AdvancedSimOptions["rebalance"])
-            }
-            className="w-full rounded-md border border-edge bg-surface px-3 py-2 text-sm outline-none focus:border-brand dark:border-edge-dark dark:bg-surface-dark-alt"
-          >
-            <option value="none">None</option>
-            <option value="monthly">Monthly</option>
-            <option value="quarterly">Quarterly</option>
-            <option value="annually">Annually</option>
-          </select>
-        </Field>
+        {!lotBased && (
+          <Field label="Rebalance">
+            <select
+              value={value.rebalance}
+              onChange={(e) =>
+                set("rebalance", e.target.value as AdvancedSimOptions["rebalance"])
+              }
+              className="w-full rounded-md border border-edge bg-surface px-3 py-2 text-sm outline-none focus:border-brand dark:border-edge-dark dark:bg-surface-dark-alt"
+            >
+              <option value="none">None</option>
+              <option value="monthly">Monthly</option>
+              <option value="quarterly">Quarterly</option>
+              <option value="annually">Annually</option>
+            </select>
+          </Field>
+        )}
 
         <Field label="Risk-free rate (%/yr)">
           <NumInput
@@ -39,14 +44,16 @@ export function AdvancedOptions({ value, onChange }: Props) {
           />
         </Field>
 
-        <Field label="Contribution escalation (%/yr)">
-          <NumInput
-            value={value.escalationPct}
-            step={0.5}
-            min={0}
-            onChange={(v) => set("escalationPct", v)}
-          />
-        </Field>
+        {!lotBased && (
+          <Field label="Contribution escalation (%/yr)">
+            <NumInput
+              value={value.escalationPct}
+              step={0.5}
+              min={0}
+              onChange={(v) => set("escalationPct", v)}
+            />
+          </Field>
+        )}
 
         <Field label="Advisory fee (%/yr)">
           <NumInput

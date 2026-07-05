@@ -230,6 +230,13 @@ def simulate_lots_detailed(
         last trading day. The same list is also attached as
         ``frame.attrs["dropped_lots"]`` so callers holding only the frame can reach it.
 
+    Caller contract: supply ``prices`` reaching back to ``min(lot.date)`` — a lot
+    dated before the frame's first row snaps to that first row (the API layer fetches
+    from the earliest lot date). Delisting: a symbol whose price history ends
+    mid-window contributes **0 value after its last real quote** (worthless-position
+    assumption; cash-out acquisitions are a known limitation) — its loss shows in
+    value and TWR rather than a stale price being carried forever.
+
     Raises:
         ValueError: if any lot amount is non-positive, or if no lot survives
             (``"no usable lots"``).
@@ -258,9 +265,20 @@ def simulate_lots_detailed(
     involved = [col_map[s] for s in {lot.symbol for lot in cleaned} if s in col_map]
     # Slice to the window first, then ffill — mirrors ``_align`` (look-ahead-safe),
     # but WITHOUT intersecting the per-symbol windows, so late listings don't truncate.
-    px = px_all.loc[window_start:, involved].ffill() if involved else px_all.iloc[0:0]
+    raw = px_all.loc[window_start:, involved] if involved else px_all.iloc[0:0]
+    px = raw.ffill()
+    # Bound each symbol at its own last real quote: a symbol whose history ends
+    # mid-window (delisted/halted) must not carry a stale price forever — that would
+    # silently overstate value and TWR. After its last quote the position contributes
+    # 0 (treated as worthless; cash-out acquisitions are a documented limitation).
+    if len(px):
+        last_row = px.index[-1]
+        for col in px.columns:
+            last_valid = raw[col].last_valid_index()
+            if last_valid is not None and last_valid < last_row:
+                px.loc[px.index > last_valid, col] = float("nan")
     win_index = px.index
-    pxv = px.fillna(0.0)  # pre-listing NaNs -> 0 (shares are 0 there anyway)
+    pxv = px.fillna(0.0)  # pre-listing / post-delisting NaNs -> 0 value contribution
 
     dropped: list[Lot] = []
     buys_by_day: dict[pd.Timestamp, list[tuple[object, float, float]]] = {}
@@ -282,6 +300,14 @@ def simulate_lots_detailed(
 
     if not buys_by_day:
         raise ValueError("no usable lots")
+
+    # Anchor the frame at the earliest PLACED buy — if the earliest lot was dropped
+    # (symbol absent/unlisted), don't emit leading rows of zero value.
+    first_buy = min(buys_by_day)
+    if first_buy != win_index[0]:
+        px = px.loc[first_buy:]
+        pxv = pxv.loc[first_buy:]
+        win_index = px.index
 
     shares = pd.Series(0.0, index=px.columns)
     invested = 0.0

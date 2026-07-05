@@ -383,3 +383,41 @@ def test_lot_future_prices_do_not_affect_past_values():
     bumped = {"AAPL": [10.0, 11.0, 99.0]}
     out_b = simulate_lots(_prices(bumped), [Lot("AAPL", date(2020, 1, 2), 1000.0)])
     assert out_a["value"].iloc[:2].tolist() == out_b["value"].iloc[:2].tolist()
+
+
+def test_lots_delisted_symbol_contributes_zero_after_last_quote():
+    # Regression (review B1): a delisted symbol must not carry a stale price forever.
+    # DEAD trades at 20 for 2 days then stops; AAPL keeps trading 10 -> 12.
+    idx = pd.date_range("2020-01-02", periods=4, freq="D")
+    prices = pd.DataFrame(
+        {
+            "AAPL": [10.0, 10.0, 11.0, 12.0],
+            "DEAD": [20.0, 20.0, np.nan, np.nan],
+        },
+        index=idx,
+    )
+    lots = [
+        Lot("AAPL", date(2020, 1, 2), 100.0),  # 10 shares
+        Lot("DEAD", date(2020, 1, 2), 100.0),  # 5 shares, worthless from day 3
+    ]
+    out, dropped = simulate_lots_detailed(prices, lots)
+    assert dropped == []
+    # Day 2: 10*10 + 5*20 = 200. Day 3: DEAD -> 0, so 10*11 = 110. Day 4: 120.
+    assert out["value"].tolist() == [200.0, 200.0, 110.0, 120.0]
+    # TWR reflects the real loss (110/200 on day 3), not a phantom flat DEAD price.
+    assert out["twr_index"].iloc[-1] == pytest.approx((200 / 200) * (110 / 200) * (120 / 110))
+
+
+def test_lots_window_anchored_at_first_placed_buy():
+    # Regression (review M2): if the earliest lot is dropped (unknown symbol), the
+    # frame must start at the first PLACED buy — no leading zero-value rows.
+    idx = pd.date_range("2020-01-02", periods=4, freq="D")
+    prices = pd.DataFrame({"AAPL": [10.0, 10.0, 11.0, 12.0]}, index=idx)
+    lots = [
+        Lot("GHOST", date(2020, 1, 2), 100.0),  # dropped: no price data at all
+        Lot("AAPL", date(2020, 1, 4), 110.0),  # placed on day 3
+    ]
+    out, dropped = simulate_lots_detailed(prices, lots)
+    assert [lot.symbol for lot in dropped] == ["GHOST"]
+    assert out.index[0] == pd.Timestamp("2020-01-04")
+    assert out["value"].tolist() == [110.0, 120.0]

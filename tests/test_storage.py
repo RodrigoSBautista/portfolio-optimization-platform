@@ -7,7 +7,7 @@ from datetime import date
 import pytest
 from sqlalchemy import create_engine
 
-from core.portfolio import Contribution, Holding, PortfolioSpec
+from core.portfolio import Contribution, Holding, Lot, PortfolioSpec
 from storage.db import make_session_factory, session_scope
 from storage.models import Base
 from storage.portfolio_io import export_json, import_json, orm_to_spec
@@ -38,6 +38,17 @@ def _spec(name="My Portfolio"):
     )
 
 
+def _lot_spec(name="Lot Portfolio"):
+    return PortfolioSpec(
+        name=name,
+        benchmark_symbol="SPY",
+        lots=[
+            Lot("AAPL", date(2021, 1, 4), 1000.0),
+            Lot("MSFT", date(2021, 6, 1), 500.0),
+        ],
+    )
+
+
 # --- users ----------------------------------------------------------------------
 
 def test_create_and_fetch_user(repo):
@@ -65,6 +76,55 @@ def test_save_with_id_replaces_holdings(repo):
     reloaded = repo.get_portfolio(user.id, p.id)
     assert reloaded.name == "Renamed"
     assert [h.symbol for h in reloaded.holdings] == ["VOO"]
+
+
+# --- lot-based portfolios -------------------------------------------------------
+
+def test_save_and_reload_lot_portfolio(repo):
+    user = repo.create_user("alice", "h")
+    p = repo.save_portfolio(user.id, _lot_spec())
+    reloaded = repo.get_portfolio(user.id, p.id)
+    assert reloaded.holdings == []  # lot-based: no weight holdings
+    assert {(lot.symbol, lot.purchase_date, lot.amount) for lot in reloaded.lots} == {
+        ("AAPL", date(2021, 1, 4), 1000.0),
+        ("MSFT", date(2021, 6, 1), 500.0),
+    }
+
+
+def test_orm_to_spec_round_trip_lots(repo):
+    user = repo.create_user("alice", "h")
+    spec = _lot_spec()
+    p = repo.save_portfolio(user.id, spec)
+    restored = orm_to_spec(p)
+    assert restored.is_lot_based
+    assert restored.to_dict() == spec.to_dict()
+
+
+def test_save_replaces_lots_on_update(repo):
+    user = repo.create_user("alice", "h")
+    p = repo.save_portfolio(user.id, _lot_spec())
+    new_spec = PortfolioSpec(name="Reworked", lots=[Lot("VOO", date(2022, 3, 1), 250.0)])
+    repo.save_portfolio(user.id, new_spec, portfolio_id=p.id)
+    reloaded = repo.get_portfolio(user.id, p.id)
+    assert [(lot.symbol, lot.amount) for lot in reloaded.lots] == [("VOO", 250.0)]
+
+
+def test_lot_json_round_trip():
+    spec = _lot_spec()
+    restored = import_json(export_json(spec))
+    assert restored.to_dict() == spec.to_dict()
+    assert [(lot.symbol, lot.date, lot.amount) for lot in restored.lots] == [
+        ("AAPL", date(2021, 1, 4), 1000.0),
+        ("MSFT", date(2021, 6, 1), 500.0),
+    ]
+
+
+def test_user_cannot_read_another_users_lot_portfolio(repo):
+    alice = repo.create_user("alice", "h")
+    bob = repo.create_user("bob", "h")
+    p = repo.save_portfolio(alice.id, _lot_spec("Alice lots"))
+    assert repo.get_portfolio(bob.id, p.id) is None
+    assert repo.list_portfolios(bob.id) == []
 
 
 # --- per-user isolation (the critical guarantee) --------------------------------

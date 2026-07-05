@@ -308,6 +308,72 @@ def test_compare_reports_dropped_holdings():
         teardown()
 
 
+# --- lot-based portfolios (smoke) -----------------------------------------------
+
+
+def _make_lot_portfolio(client, headers, name: str, symbol: str) -> int:
+    """Create a lot-based portfolio (dated purchases) and return its id."""
+    spec = {
+        "name": name,
+        "benchmark_symbol": "SPY",
+        "base_currency": "USD",
+        "lots": [
+            {"symbol": symbol, "date": "2021-01-04", "amount": 1000.0},
+            {"symbol": symbol, "date": "2021-03-01", "amount": 500.0},
+        ],
+    }
+    resp = client.post("/api/portfolios", json=spec, headers=headers)
+    assert resp.status_code == 201, resp.text
+    body = resp.json()
+    # CRUD carries lots through create/get.
+    assert len(body["lots"]) == 2
+    assert body["holdings"] == []
+    return body["id"]
+
+
+def test_lot_portfolio_crud_round_trip(client):
+    headers = auth_headers(client, "lotcrud")
+    pid = _make_lot_portfolio(client, headers, "Lots", "AAPL")
+    got = client.get(f"/api/portfolios/{pid}", headers=headers).json()
+    assert {lot["symbol"] for lot in got["lots"]} == {"AAPL"}
+    listed = client.get("/api/portfolios", headers=headers).json()
+    assert listed[0]["lots"] and listed[0]["holdings"] == []
+
+
+def test_compare_accepts_lot_specs(client):
+    headers = auth_headers(client, "lotcmp")
+    a = _make_lot_portfolio(client, headers, "LotsA", "AAPL")
+    b = _make_lot_portfolio(client, headers, "LotsB", "MSFT")
+    body = {"portfolio_ids": [a, b], "start": "2021-01-04", "benchmark": "SPY"}
+    resp = client.post("/api/compare", json=body, headers=headers)
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert len(data["results"]) == 2
+    assert all(r["series"] for r in data["results"])
+    assert data["benchmark_series"]
+
+
+def test_refresh_writes_valuations_for_lot_portfolio(client):
+    headers = auth_headers(client, "lottrack")
+    pid = _make_lot_portfolio(client, headers, "TrackedLots", "AAPL")
+    resp = client.post(f"/api/portfolios/{pid}/refresh", json={}, headers=headers)
+    assert resp.status_code == 200, resp.text
+    written = resp.json()["written"]
+    assert written > 0
+
+    stored = client.get(f"/api/portfolios/{pid}/valuations", headers=headers).json()["valuations"]
+    assert len(stored) == written
+    assert stored[0]["market_value"] > 0
+    assert stored[0]["benchmark_value"] is not None
+
+    # Idempotent: re-running upserts in place, no duplicate dates.
+    again = client.post(f"/api/portfolios/{pid}/refresh", json={}, headers=headers)
+    assert again.json()["written"] == written
+    rows = client.get(f"/api/portfolios/{pid}/valuations", headers=headers).json()["valuations"]
+    dates = [r["date"] for r in rows]
+    assert len(dates) == len(set(dates))
+
+
 def test_valuations_foreign_id_is_404(client):
     a_headers = auth_headers(client, "val_a")
     b_headers = auth_headers(client, "val_b")

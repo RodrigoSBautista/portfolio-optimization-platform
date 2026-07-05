@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from datetime import date
+
 import numpy as np
 import pandas as pd
 import pytest
 
 from app.sim_runner import SimError, format_metrics, run_simulation
-from core.portfolio import LUMP_SUM, Contribution, Holding, PortfolioSpec
+from core.portfolio import LUMP_SUM, Contribution, Holding, Lot, PortfolioSpec
 from data.provider import common_history
 
 
@@ -82,6 +84,57 @@ def test_run_simulation_portfolio_holding_its_own_benchmark():
     assert res.has_benchmark
     assert res.benchmark_value.ndim == 1  # 1-D series, not a 2-D slice
     assert res.benchmark_value.iloc[-1] == pytest.approx(1020.0)  # SPY +2%
+
+
+# --- lot-based branch -----------------------------------------------------------
+
+
+def _lot_prices():
+    idx = pd.date_range("2021-01-04", periods=3, freq="B")
+    return pd.DataFrame(
+        {"AAPL": [10.0, 11.0, 12.0], "SPY": [100.0, 110.0, 120.0]}, index=idx
+    )
+
+
+def test_run_simulation_lot_branch_exact_values_and_dropped():
+    # AAPL: 1000$ on day 0 -> 100 shares; value 1000/1100/1200. ZZZZ has no price data
+    # (dropped) and is excluded from BOTH the portfolio and the benchmark mirror flows.
+    spec = PortfolioSpec(
+        name="Lots",
+        benchmark_symbol="SPY",
+        lots=[
+            Lot("AAPL", date(2021, 1, 4), 1000.0),
+            Lot("ZZZZ", date(2021, 1, 4), 500.0),
+        ],
+    )
+    res = run_simulation(spec, _lot_prices())
+    assert res.invested == pytest.approx(1000.0)
+    assert res.final_value == pytest.approx(1200.0)
+    assert list(res.sim["value"]) == pytest.approx([1000.0, 1100.0, 1200.0])
+    assert res.dropped == ["ZZZZ"]  # symbol with no price data surfaced
+
+    # Benchmark uses MIRROR lots: the SAME placed dollars (1000$) into SPY on the same
+    # day -> day-0 value equals the invested amount (equal flows), grows with SPY.
+    assert res.has_benchmark
+    assert res.benchmark_value.iloc[0] == pytest.approx(1000.0)
+    assert res.benchmark_value.iloc[-1] == pytest.approx(1200.0)  # SPY +20%
+    assert list(res.benchmark_value.index) == list(res.sim.index)  # aligned windows
+
+
+def test_run_simulation_lot_branch_rejects_weight_overrides():
+    spec = PortfolioSpec(
+        name="Lots",
+        benchmark_symbol="SPY",
+        lots=[Lot("AAPL", date(2021, 1, 4), 1000.0)],
+    )
+    prices = _lot_prices()
+    for override in ({"annual_fee_pct": 1.0}, {"rebalance": "monthly"}, {"escalation_pct": 5.0}):
+        with pytest.raises(SimError):
+            run_simulation(spec, prices, sim_overrides=override)
+    # Trivial (zero/None) overrides are fine — they simply don't apply.
+    trivial = {"annual_fee_pct": 0.0, "rebalance": None, "escalation_pct": 0.0}
+    ok = run_simulation(spec, prices, sim_overrides=trivial)
+    assert ok.final_value == pytest.approx(1200.0)
 
 
 def test_format_metrics_keys():

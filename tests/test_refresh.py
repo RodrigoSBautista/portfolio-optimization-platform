@@ -6,9 +6,10 @@ from datetime import date
 
 import numpy as np
 import pandas as pd
+import pytest
 from sqlalchemy import create_engine
 
-from core.portfolio import LUMP_SUM, RECURRING, Contribution, Holding, PortfolioSpec
+from core.portfolio import LUMP_SUM, RECURRING, Contribution, Holding, Lot, PortfolioSpec
 from data.prices import PriceService
 from jobs.refresh import build_valuations, refresh_portfolio
 from storage.db import make_session_factory
@@ -93,6 +94,44 @@ def test_refresh_portfolio_aligns_histories_and_is_idempotent():
     again = refresh_portfolio(repo, service, user.id, portfolio.id, spec, date(2020, 1, 1))
     assert again == 3
     assert len(repo.get_valuations(user.id, portfolio.id)) == 3
+    session.close()
+
+
+def test_refresh_portfolio_lot_based_is_idempotent():
+    # A lot portfolio: 1000$ into AAPL on day 0 -> 100 shares. Benchmark line mirrors the
+    # same 1000$ into SPY on the same day. Refresh writes one row per trading day.
+    idx = pd.date_range("2021-01-04", periods=5, freq="B")
+    data = pd.DataFrame(
+        {
+            "AAPL": [10.0, 11.0, 12.0, 13.0, 14.0],
+            "SPY": [100.0, 101.0, 102.0, 103.0, 104.0],
+        },
+        index=idx,
+    )
+    engine = create_engine("sqlite://", future=True)
+    Base.metadata.create_all(engine)
+    session = make_session_factory(engine)()
+    repo = Repository(session)
+    user = repo.create_user("a", "h")
+    spec = PortfolioSpec(
+        name="p",
+        benchmark_symbol="SPY",
+        lots=[Lot("AAPL", date(2021, 1, 4), 1000.0)],
+    )
+    portfolio = repo.save_portfolio(user.id, spec)
+    service = PriceService(provider=_FakeProvider(data), cache=None)
+
+    written = refresh_portfolio(repo, service, user.id, portfolio.id, spec, date(2021, 1, 1))
+    vals = repo.get_valuations(user.id, portfolio.id)
+    assert written == 5 and len(vals) == 5
+    assert vals[0].market_value == 1000.0  # bought day 0
+    assert vals[-1].market_value == pytest.approx(1400.0)  # 100 shares * 14
+    assert vals[0].benchmark_value == 1000.0  # mirror 1000$ into SPY at 100
+
+    # Re-run: idempotent upsert on (portfolio_id, as_of_date) -> no duplicate rows.
+    again = refresh_portfolio(repo, service, user.id, portfolio.id, spec, date(2021, 1, 1))
+    assert again == 5
+    assert len(repo.get_valuations(user.id, portfolio.id)) == 5
     session.close()
 
 

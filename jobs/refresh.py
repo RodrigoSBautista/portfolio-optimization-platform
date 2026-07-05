@@ -17,6 +17,7 @@ from datetime import date
 
 import pandas as pd
 
+from app.sim_runner import SimError, run_simulation
 from core.portfolio import PortfolioSpec
 from core.simulation import simulate_portfolio
 from data.prices import PriceService
@@ -55,6 +56,9 @@ def refresh_portfolio(
     end: date | None = None,
 ) -> int:
     """Compute and upsert daily valuations for one portfolio. Returns rows written."""
+    if spec.is_lot_based:
+        return _refresh_lots(repo, prices, user_id, portfolio_id, spec, end)
+
     symbols = sorted({h.symbol.upper() for h in spec.holdings})
     benchmark = spec.benchmark_symbol.upper()
     # Dedupe the request (the benchmark may also be a holding) and drop any duplicated
@@ -88,6 +92,48 @@ def refresh_portfolio(
             float(row["benchmark_value"]),
         )
     return len(valuations)
+
+
+def _refresh_lots(
+    repo: Repository,
+    prices: PriceService,
+    user_id: int,
+    portfolio_id: int,
+    spec: PortfolioSpec,
+    end: date | None,
+) -> int:
+    """Upsert valuations for a lot-based portfolio (dated purchases).
+
+    Same shape as the weight-based path but uses ``run_simulation``'s lot engine:
+    ``value`` is the portfolio market value and the benchmark line invests each placed
+    lot's dollars into the benchmark on the same date (mirror flows). ``start`` is
+    ignored — the window is fixed by the lot dates, fetched from ``min(lot.date)``.
+    """
+    benchmark = spec.benchmark_symbol.upper()
+    symbols = sorted({lot.symbol.upper() for lot in spec.lots} | {benchmark})
+    fetch_start = min(lot.date for lot in spec.lots)
+    frame = prices.get_adjusted_close(symbols, fetch_start, end)
+    if frame.empty:
+        return 0
+    frame = frame.loc[:, ~frame.columns.duplicated()]
+
+    try:
+        result = run_simulation(spec, frame, benchmark)
+    except (SimError, ValueError):
+        return 0
+
+    sim = result.sim
+    bench = result.benchmark_value
+    written = 0
+    for ts, row in sim.iterrows():
+        bench_value = (
+            float(bench.loc[ts]) if bench is not None and ts in bench.index else None
+        )
+        repo.upsert_valuation(
+            user_id, portfolio_id, ts.date(), float(row["value"]), bench_value
+        )
+        written += 1
+    return written
 
 
 def main(start: date | None = None) -> None:

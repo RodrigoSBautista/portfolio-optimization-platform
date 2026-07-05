@@ -61,12 +61,23 @@ class ContributionDTO(BaseModel):
     end_date: date | None = None
 
 
+class LotDTO(BaseModel):
+    """A single dated purchase: ``amount`` dollars of ``symbol`` bought on ``date``."""
+
+    symbol: str
+    date: date
+    amount: float
+
+
 class PortfolioSpecDTO(BaseModel):
     name: str
     benchmark_symbol: str = "SPY"
     base_currency: str = "USD"
     holdings: list[HoldingDTO] = Field(default_factory=list)
     contributions: list[ContributionDTO] = Field(default_factory=list)
+    # A lot-based spec (dated purchases) instead of target weights. Empty for the
+    # classic weight-based flow; the spec's ``is_lot_based`` decides which engine runs.
+    lots: list[LotDTO] = Field(default_factory=list)
 
     def to_spec(self) -> PortfolioSpec:
         return PortfolioSpec.from_dict(self.model_dump(mode="json"))
@@ -87,13 +98,19 @@ class PortfolioOut(PortfolioSpecDTO):
 
 class SimulateRequest(BaseModel):
     spec: PortfolioSpecDTO
-    start: date
+    # Weight-based specs REQUIRE start. Lot-based specs IGNORE it (the window is fixed
+    # by the lot dates, fetched from min(lot.date)); optional so a lot-only client may
+    # omit it entirely.
+    start: date | None = None
     benchmark: str | None = None
     # New optional analytics fields (all backward-compatible defaults).
     end: date | None = None  # window end (YYYY-MM-DD) so crisis windows work
     rebalance: str | None = None  # "monthly" | "quarterly" | "annually" | None
     risk_free_rate: float = 0.04  # FRACTION (0.04 = 4%/yr) for Sharpe/Sortino
     inflation_pct: float | None = None  # PERCENT (2.5 = 2.5%/yr); enables real values
+    # escalation_pct / annual_fee_pct / rebalance are NOT supported for lot-based specs
+    # (dated purchases have no recurring contribution, target weights, or fee model) —
+    # the /simulate route rejects any non-trivial value with a 422 for lot specs.
     escalation_pct: float = 0.0  # PERCENT annual growth of the recurring contribution
     annual_fee_pct: float = 0.0  # PERCENT advisory-fee drag
     include_analytics: bool = False  # attach drawdown + rolling series
@@ -118,6 +135,12 @@ class RollingPoint(BaseModel):
     vol_1y: float | None = None  # annualized vol of 252-day daily returns
 
 
+class BuyMarker(BaseModel):
+    date: date  # SNAPPED trading date (first trading day >= the lot's purchase date)
+    symbol: str
+    amount: float
+
+
 class SimulateResponse(BaseModel):
     series: list[SeriesPoint]
     metrics: dict[str, dict[str, str]]
@@ -129,6 +152,8 @@ class SimulateResponse(BaseModel):
     real_final_value: float | None = None  # null unless inflation_pct set
     drawdown: list[DrawdownPoint] | None = None  # null unless include_analytics
     rolling: list[RollingPoint] | None = None  # null unless include_analytics
+    # Snapped purchase dates for a lot-based spec; null for weight-based specs.
+    buy_markers: list[BuyMarker] | None = None
 
 
 # --- optimize -------------------------------------------------------------------

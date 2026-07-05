@@ -9,10 +9,12 @@ from __future__ import annotations
 
 from datetime import date
 
+import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from api.deps import get_current_user, get_price_service
 from api.schemas import (
+    BuyMarker,
     ComparisonPoint,
     DrawdownPoint,
     OptimizeRequest,
@@ -72,6 +74,17 @@ def simulate(
 ) -> SimulateResponse:
     spec = body.spec.to_spec()
     benchmark = (body.benchmark or spec.benchmark_symbol).upper()
+
+    # Lot-based specs (dated purchases) run a different engine: the window comes from
+    # the lot dates (start is ignored) and several weight-based knobs don't apply.
+    if spec.is_lot_based:
+        return _simulate_lots(body, spec, benchmark, prices_svc)
+
+    if body.start is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="start is required for weight-based portfolios",
+        )
     symbols = sorted({h.symbol.upper() for h in spec.holdings} | {benchmark})
     if not spec.holdings:
         raise HTTPException(
@@ -104,6 +117,84 @@ def simulate(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
         ) from exc
 
+    return _build_simulate_response(body, spec, result)
+
+
+def _simulate_lots(
+    body: SimulateRequest,
+    spec,
+    benchmark: str,
+    prices_svc: PriceService,
+) -> SimulateResponse:
+    """Simulate a lot-based spec: window fixed by lot dates; weight-knobs rejected."""
+    # These have no meaning for dated purchases (no target weights to rebalance to, no
+    # recurring contribution to escalate, no fee model in the lots engine) -> 422.
+    if body.rebalance is not None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="rebalance is not applicable to dated-purchase portfolios",
+        )
+    if body.escalation_pct:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="escalation_pct is not applicable to dated-purchase portfolios",
+        )
+    if body.annual_fee_pct:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="annual_fee_pct is not applicable to dated-purchase portfolios",
+        )
+
+    # Per the core caller contract, fetch from the earliest lot date (start ignored)
+    # through end (or today) for every lot symbol plus the benchmark.
+    symbols = sorted({lot.symbol.upper() for lot in spec.lots} | {benchmark})
+    fetch_start = min(lot.date for lot in spec.lots)
+    prices = prices_svc.get_adjusted_close(symbols, fetch_start, body.end)
+    if prices.empty:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="No price data for the requested lots and window",
+        )
+
+    try:
+        result = run_simulation(spec, prices, benchmark)
+    except (SimError, ValueError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
+
+    buy_markers = _buy_markers(spec, prices.index, set(result.dropped))
+    return _build_simulate_response(body, spec, result, buy_markers=buy_markers)
+
+
+def _buy_markers(spec, index, dropped: set[str]) -> list[BuyMarker]:
+    """Snap each placed lot's purchase date FORWARD to the first trading day >= it.
+
+    Uses the fetched price index (the same union calendar the lots engine snaps on), so
+    a weekend/holiday-dated lot lands on the next trading day. Lots whose symbol dropped
+    out (no price data) are excluded, as is any lot dated past the last trading day.
+    """
+    trading = index.sort_values()
+    markers: list[BuyMarker] = []
+    for lot in spec.lots:
+        sym = lot.symbol.upper()
+        if sym in dropped:
+            continue
+        pos = trading.searchsorted(pd.Timestamp(lot.date), side="left")
+        if pos >= len(trading):
+            continue
+        markers.append(BuyMarker(date=trading[pos].date(), symbol=sym, amount=lot.amount))
+    return markers
+
+
+def _build_simulate_response(
+    body: SimulateRequest,
+    spec,
+    result,
+    *,
+    buy_markers: list[BuyMarker] | None = None,
+) -> SimulateResponse:
+    """Shared response builder for both the weight-based and lot-based paths."""
     sim = result.sim
     bench = result.benchmark_value
 
@@ -122,7 +213,9 @@ def simulate(
                 date=ts.date(),
                 value=float(row["value"]),
                 invested=float(row["invested"]),
-                benchmark=(float(bench.loc[ts]) if bench is not None else None),
+                benchmark=(
+                    float(bench.loc[ts]) if bench is not None and ts in bench.index else None
+                ),
                 real_value=(
                     _safe_float(float(real_series.loc[ts])) if real_series is not None else None
                 ),
@@ -160,6 +253,7 @@ def simulate(
         real_final_value=real_final_value,
         drawdown=drawdown,
         rolling=rolling,
+        buy_markers=buy_markers,
     )
 
 

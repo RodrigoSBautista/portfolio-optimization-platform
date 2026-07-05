@@ -34,6 +34,21 @@ _Last updated: 2026-07-04_
 
 ## Done (latest)
 
+- **✅ Lot-based persistence + API (`feat/api-lots`)** — dated-purchase portfolios
+  now persist and flow through the REST layer end to end (219 tests green; ruff clean).
+  **Storage:** `LotRow` model + `Portfolio.lots` (delete-orphan cascade), Alembic
+  migration `5cbf39db2a2f` (up/down round-trip verified on scratch SQLite);
+  `repository.save_portfolio` replaces lots on update, `portfolio_io.orm_to_spec` and
+  JSON export/import restore them (spec v2). **sim_runner:** lot branch in
+  `run_simulation` (`simulate_lots_detailed` + mirror-lot benchmark with identical
+  dollars/dates; rejects fee/rebalance/escalation overrides as `SimError`; weighted
+  path unchanged). **API:** `LotDTO` + `PortfolioSpecDTO.lots`, `BuyMarker` +
+  `SimulateResponse.buy_markers`; `/api/simulate` lot mode ignores `start`, fetches
+  from `min(lot.date)`, 422s the inapplicable knobs, returns snapped buy markers;
+  portfolios CRUD + compare carry lots. **jobs/refresh:** lot branch (mirror benchmark,
+  idempotent upsert).
+
+
 - **✅ Analytics push — simulations upgraded end to end** (4 increments, every branch
   independently reviewed before merge; 189+ tests green; ruff + web gates clean).
   **Core** (quant-ml agent, math-reviewed with numerical probes): rf-aware Sharpe

@@ -41,6 +41,59 @@ def test_simulate_returns_series_and_metrics(client):
     assert data["benchmark"] == "SPY"
 
 
+def test_simulate_weighted_has_no_buy_markers(client):
+    """Back-compat: weight-based responses carry buy_markers=null (lots-only field)."""
+    headers = auth_headers(client, "wbm")
+    body = {
+        "spec": {"name": "W", "holdings": [{"symbol": "AAPL", "weight": 1.0}]},
+        "start": "2021-01-04",
+    }
+    resp = client.post("/api/simulate", json=body, headers=headers)
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["buy_markers"] is None
+
+
+# --- lot-based simulate ---------------------------------------------------------
+
+
+_LOT_SPEC = {
+    "name": "Dated",
+    "benchmark_symbol": "SPY",
+    "lots": [
+        {"symbol": "AAPL", "date": "2021-01-04", "amount": 1000.0},
+        # 2021-01-09 is a Saturday -> must snap FORWARD to Mon 2021-01-11.
+        {"symbol": "MSFT", "date": "2021-01-09", "amount": 500.0},
+    ],
+}
+
+
+def test_simulate_lot_mode_buy_markers_snapped(client):
+    headers = auth_headers(client, "lots")
+    # start is deliberately absurd (future) to prove lot mode IGNORES it.
+    body = {"spec": _LOT_SPEC, "start": "2050-01-01", "benchmark": "SPY"}
+    resp = client.post("/api/simulate", json=body, headers=headers)
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+
+    # Window comes from the lot dates, not the (ignored) start.
+    assert data["series"][0]["date"] == "2021-01-04"
+    assert data["invested"] == pytest.approx(1500.0)
+    assert data["dropped"] == []
+
+    markers = {m["symbol"]: m for m in data["buy_markers"]}
+    assert markers["AAPL"]["date"] == "2021-01-04"  # already a trading day
+    assert markers["MSFT"]["date"] == "2021-01-11"  # weekend snapped forward to Monday
+    assert markers["MSFT"]["amount"] == pytest.approx(500.0)
+
+
+def test_simulate_lot_mode_rejects_weight_knobs(client):
+    headers = auth_headers(client, "lotknobs")
+    for extra in ({"rebalance": "monthly"}, {"escalation_pct": 5.0}, {"annual_fee_pct": 1.0}):
+        body = {"spec": _LOT_SPEC, "benchmark": "SPY", **extra}
+        resp = client.post("/api/simulate", json=body, headers=headers)
+        assert resp.status_code == 422, (extra, resp.text)
+
+
 def test_simulate_requires_auth(client):
     body = {"spec": {"name": "x", "holdings": [{"symbol": "AAPL", "weight": 1.0}]},
             "start": "2021-01-04"}

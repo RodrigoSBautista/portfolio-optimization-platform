@@ -75,6 +75,8 @@ def compare(
     all_tickers = {benchmark}
     for _pid, spec in ordered:
         all_tickers |= {h.symbol.upper() for h in spec.holdings}
+        # Lot-based portfolios carry their symbols in ``lots``, not ``holdings``.
+        all_tickers |= {lot.symbol.upper() for lot in spec.lots}
     prices = prices_svc.get_adjusted_close(sorted(all_tickers), body.start)
     if prices.empty:
         raise HTTPException(

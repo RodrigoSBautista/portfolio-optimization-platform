@@ -12,7 +12,7 @@ from collections.abc import Mapping
 from dataclasses import asdict, dataclass, field
 from datetime import date
 
-SPEC_VERSION = 1
+SPEC_VERSION = 2
 LUMP_SUM = "lump_sum"
 RECURRING = "recurring"
 
@@ -21,6 +21,20 @@ RECURRING = "recurring"
 class Holding:
     symbol: str
     weight: float
+
+
+@dataclass(frozen=True)
+class Lot:
+    """A single dated purchase: ``amount`` dollars of ``symbol`` bought on ``date``.
+
+    Real portfolios are built over time — each position has its own purchase date
+    and dollar amount, and entry timing drives actual performance. A lot-based spec
+    is a list of these, consumed by ``core.simulation.simulate_lots``.
+    """
+
+    symbol: str
+    date: date
+    amount: float
 
 
 @dataclass(frozen=True)
@@ -39,6 +53,12 @@ class PortfolioSpec:
     benchmark_symbol: str = "SPY"
     base_currency: str = "USD"
     contributions: list[Contribution] = field(default_factory=list)
+    lots: list[Lot] = field(default_factory=list)
+
+    @property
+    def is_lot_based(self) -> bool:
+        """True when this spec describes dated purchases rather than target weights."""
+        return bool(self.lots)
 
     def weights(self) -> dict[str, float]:
         """Raw target weights keyed by upper-cased symbol (unnormalized)."""
@@ -62,6 +82,7 @@ class PortfolioSpec:
             "base_currency": self.base_currency,
             "holdings": [{"symbol": h.symbol.upper(), "weight": h.weight} for h in self.holdings],
             "contributions": [_contribution_to_dict(c) for c in self.contributions],
+            "lots": [_lot_to_dict(lot) for lot in self.lots],
         }
 
     @classmethod
@@ -77,6 +98,8 @@ class PortfolioSpec:
             contributions=[
                 _contribution_from_dict(c) for c in data.get("contributions", [])
             ],
+            # Backward compatible: v1 payloads have no "lots" key -> empty list.
+            lots=[_lot_from_dict(lot) for lot in data.get("lots", [])],
         )
 
 
@@ -97,6 +120,22 @@ def _contribution_to_dict(c: Contribution) -> dict:
     out["start_date"] = c.start_date.isoformat() if c.start_date else None
     out["end_date"] = c.end_date.isoformat() if c.end_date else None
     return out
+
+
+def _lot_to_dict(lot: Lot) -> dict:
+    return {
+        "symbol": lot.symbol.upper(),
+        "date": lot.date.isoformat(),
+        "amount": float(lot.amount),
+    }
+
+
+def _lot_from_dict(data: Mapping) -> Lot:
+    return Lot(
+        symbol=data["symbol"].upper(),
+        date=date.fromisoformat(data["date"]),
+        amount=float(data["amount"]),
+    )
 
 
 def _contribution_from_dict(data: Mapping) -> Contribution:

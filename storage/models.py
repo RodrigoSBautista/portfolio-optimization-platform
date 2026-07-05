@@ -51,6 +51,9 @@ class Portfolio(Base):
     holdings: Mapped[list[Holding]] = relationship(
         back_populates="portfolio", cascade="all, delete-orphan"
     )
+    lots: Mapped[list[LotRow]] = relationship(
+        back_populates="portfolio", cascade="all, delete-orphan"
+    )
     contributions: Mapped[list[Contribution]] = relationship(
         back_populates="portfolio", cascade="all, delete-orphan"
     )
@@ -68,6 +71,26 @@ class Holding(Base):
     target_weight: Mapped[float] = mapped_column(Float)
 
     portfolio: Mapped[Portfolio] = relationship(back_populates="holdings")
+
+
+class LotRow(Base):
+    """A single dated purchase (``amount`` dollars of ``symbol`` on ``purchase_date``).
+
+    The persisted form of ``core.portfolio.Lot``. Mirrors ``Holding``: a child of a
+    portfolio, replaced wholesale on save (delete-orphan cascade). A portfolio is
+    either weight-based (holdings) or lot-based (lots) — the spec decides via
+    ``is_lot_based``; the schema simply stores whichever is present.
+    """
+
+    __tablename__ = "lots"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    portfolio_id: Mapped[int] = mapped_column(ForeignKey("portfolios.id"), index=True)
+    symbol: Mapped[str] = mapped_column(String(16))
+    purchase_date: Mapped[date] = mapped_column(Date)
+    amount: Mapped[float] = mapped_column(Float)
+
+    portfolio: Mapped[Portfolio] = relationship(back_populates="lots")
 
 
 class Contribution(Base):

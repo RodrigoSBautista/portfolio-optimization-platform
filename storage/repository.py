@@ -13,7 +13,14 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from core.portfolio import PortfolioSpec
-from storage.models import Contribution, DailyValuation, Holding, Portfolio, User
+from storage.models import (
+    Contribution,
+    DailyValuation,
+    Holding,
+    LotRow,
+    Portfolio,
+    User,
+)
 
 
 class Repository:
@@ -38,7 +45,11 @@ class Repository:
 
     # Eager-load child collections so callers can read holdings/contributions (and
     # convert via orm_to_spec) after the session closes, without DetachedInstanceError.
-    _EAGER = (selectinload(Portfolio.holdings), selectinload(Portfolio.contributions))
+    _EAGER = (
+        selectinload(Portfolio.holdings),
+        selectinload(Portfolio.lots),
+        selectinload(Portfolio.contributions),
+    )
 
     def list_portfolios(self, user_id: int) -> list[Portfolio]:
         return list(
@@ -77,6 +88,11 @@ class Repository:
         portfolio.base_currency = spec.base_currency
         portfolio.holdings = [
             Holding(symbol=h.symbol.upper(), target_weight=h.weight) for h in spec.holdings
+        ]
+        # Dated purchases (lot-based specs); replaced wholesale like holdings.
+        portfolio.lots = [
+            LotRow(symbol=lot.symbol.upper(), purchase_date=lot.date, amount=lot.amount)
+            for lot in spec.lots
         ]
         portfolio.contributions = [
             Contribution(

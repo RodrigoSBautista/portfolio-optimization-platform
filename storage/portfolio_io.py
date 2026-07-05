@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 
-from core.portfolio import Contribution, Holding, PortfolioSpec
+from core.portfolio import Contribution, Holding, Lot, PortfolioSpec
 from storage.models import Portfolio
 
 
@@ -34,6 +34,7 @@ def orm_to_spec(portfolio: Portfolio) -> PortfolioSpec:
         benchmark_symbol=portfolio.benchmark_symbol,
         base_currency=portfolio.base_currency,
         holdings=[Holding(h.symbol.upper(), h.target_weight) for h in portfolio.holdings],
+        lots=[Lot(lot.symbol.upper(), lot.purchase_date, lot.amount) for lot in portfolio.lots],
         contributions=[
             Contribution(
                 kind=c.kind,

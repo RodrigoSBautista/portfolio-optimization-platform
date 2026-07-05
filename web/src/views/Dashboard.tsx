@@ -12,6 +12,7 @@ import { ChartSkeleton, KpiGridSkeleton, TableSkeleton } from "../components/Ske
 import { crossFade, staggerContainer } from "../lib/motion";
 import { CRISIS_PRESETS, RANGES, startForRange, type RangeKey } from "../lib/dates";
 import { formatCurrency, formatSignedCurrency, metricSign } from "../lib/format";
+import { displaySymbols, firstPurchaseDate, isLotBased } from "../lib/lots";
 import { AdvancedOptions } from "./dashboard/AdvancedOptions";
 import {
   DEFAULT_ADVANCED,
@@ -34,11 +35,31 @@ export function Dashboard({ portfolio, onDelete }: Props) {
 
   const preset = CRISIS_PRESETS.find((p) => p.key === presetKey) ?? null;
 
+  // Lot-based ("actual purchases") portfolios: the backend fixes the window
+  // (earliest purchase → today), ignores `start`, and 422s on rebalance/
+  // escalation — so those controls are hidden and omitted from the request.
+  const lotBased = isLotBased(portfolio);
+  const firstBuy = firstPurchaseDate(portfolio);
+
   const rebalance: RebalanceCadence | null =
     adv.rebalance === "none" ? null : adv.rebalance;
 
-  const req = useMemo<SimulateRequest>(
-    () => ({
+  const req = useMemo<SimulateRequest>(() => {
+    if (lotBased) {
+      // `start` is ignored by the backend for lot specs; send a stable value
+      // (earliest purchase) so the query key doesn't churn. Omit rebalance +
+      // escalation entirely (they 422 for lot specs).
+      return {
+        spec: portfolio,
+        start: firstBuy ?? "2010-01-01",
+        benchmark: portfolio.benchmark_symbol,
+        risk_free_rate: adv.riskFreePct / 100,
+        inflation_pct: adv.inflationOn ? adv.inflationPct : null,
+        annual_fee_pct: adv.annualFeePct,
+        include_analytics: showAnalytics,
+      };
+    }
+    return {
       spec: portfolio,
       start: preset ? preset.start : startForRange(range),
       end: preset ? preset.end : null,
@@ -49,9 +70,8 @@ export function Dashboard({ portfolio, onDelete }: Props) {
       escalation_pct: adv.escalationPct,
       annual_fee_pct: adv.annualFeePct,
       include_analytics: showAnalytics,
-    }),
-    [portfolio, range, preset, rebalance, adv, showAnalytics],
-  );
+    };
+  }, [portfolio, lotBased, firstBuy, range, preset, rebalance, adv, showAnalytics]);
 
   const { data, isLoading, isError, error } = useSimulation(req);
 
@@ -71,30 +91,34 @@ export function Dashboard({ portfolio, onDelete }: Props) {
         <div>
           <h1 className="text-xl font-semibold">{portfolio.name}</h1>
           <p className="text-sm text-content-muted dark:text-content-dark-muted">
-            {portfolio.holdings.map((h) => h.symbol).join(", ")} · benchmark{" "}
+            {displaySymbols(portfolio).join(", ")} · benchmark{" "}
             {portfolio.benchmark_symbol}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex gap-1 rounded-lg border border-edge bg-surface-alt p-1 dark:border-edge-dark dark:bg-surface-dark-alt">
-            {RANGES.map((r) => (
-              <button
-                key={r}
-                onClick={() => {
-                  // Any range-tab click clears an active crisis preset.
-                  setPresetKey(null);
-                  setRange(r);
-                }}
-                className={`rounded-md px-3 py-1 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${
-                  !preset && range === r
-                    ? "bg-surface text-content shadow-sm dark:bg-surface-dark dark:text-content-dark"
-                    : "text-content-muted hover:text-content dark:text-content-dark-muted dark:hover:text-content-dark"
-                }`}
-              >
-                {r}
-              </button>
-            ))}
-          </div>
+          {/* Range tabs only apply to weighted specs; the backend fixes the
+              window for lot specs (see the "Since first purchase" caption). */}
+          {!lotBased && (
+            <div className="flex gap-1 rounded-lg border border-edge bg-surface-alt p-1 dark:border-edge-dark dark:bg-surface-dark-alt">
+              {RANGES.map((r) => (
+                <button
+                  key={r}
+                  onClick={() => {
+                    // Any range-tab click clears an active crisis preset.
+                    setPresetKey(null);
+                    setRange(r);
+                  }}
+                  className={`rounded-md px-3 py-1 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${
+                    !preset && range === r
+                      ? "bg-surface text-content shadow-sm dark:bg-surface-dark dark:text-content-dark"
+                      : "text-content-muted hover:text-content dark:text-content-dark-muted dark:hover:text-content-dark"
+                  }`}
+                >
+                  {r}
+                </button>
+              ))}
+            </div>
+          )}
           {onDelete && (
             <button
               onClick={() => {
@@ -112,36 +136,45 @@ export function Dashboard({ portfolio, onDelete }: Props) {
         </div>
       </div>
 
-      {/* Crisis preset chips — set an explicit start+end drawdown window. */}
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs font-medium text-content-muted dark:text-content-dark-muted">
-          Crisis windows:
-        </span>
-        {CRISIS_PRESETS.map((p) => {
-          const active = presetKey === p.key;
-          return (
-            <button
-              key={p.key}
-              onClick={() => setPresetKey(active ? null : p.key)}
-              aria-pressed={active}
-              className={`rounded-full border px-3 py-1 text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${
-                active
-                  ? "border-brand bg-brand/10 text-brand"
-                  : "border-edge text-content-muted hover:text-content dark:border-edge-dark dark:text-content-dark-muted dark:hover:text-content-dark"
-              }`}
-            >
-              {p.label}
-            </button>
-          );
-        })}
-        {preset && (
-          <span className="text-xs text-content-muted dark:text-content-dark-muted">
-            {preset.start} → {preset.end}
+      {lotBased ? (
+        // Lot specs have a fixed window (earliest purchase → today); crisis
+        // windows don't apply, so show the window as a caption instead.
+        <div className="text-xs text-content-muted dark:text-content-dark-muted">
+          Since first purchase{firstBuy ? ` (${firstBuy})` : ""} — the window is
+          fixed by your earliest buy.
+        </div>
+      ) : (
+        /* Crisis preset chips — set an explicit start+end drawdown window. */
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium text-content-muted dark:text-content-dark-muted">
+            Crisis windows:
           </span>
-        )}
-      </div>
+          {CRISIS_PRESETS.map((p) => {
+            const active = presetKey === p.key;
+            return (
+              <button
+                key={p.key}
+                onClick={() => setPresetKey(active ? null : p.key)}
+                aria-pressed={active}
+                className={`rounded-full border px-3 py-1 text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${
+                  active
+                    ? "border-brand bg-brand/10 text-brand"
+                    : "border-edge text-content-muted hover:text-content dark:border-edge-dark dark:text-content-dark-muted dark:hover:text-content-dark"
+                }`}
+              >
+                {p.label}
+              </button>
+            );
+          })}
+          {preset && (
+            <span className="text-xs text-content-muted dark:text-content-dark-muted">
+              {preset.start} → {preset.end}
+            </span>
+          )}
+        </div>
+      )}
 
-      <AdvancedOptions value={adv} onChange={setAdv} />
+      <AdvancedOptions value={adv} onChange={setAdv} lotBased={lotBased} />
 
       <label className="flex items-center gap-2 text-sm text-content-muted dark:text-content-dark-muted">
         <input
@@ -181,7 +214,9 @@ export function Dashboard({ portfolio, onDelete }: Props) {
             {/* Cross-fade the chart when the range (data) changes. */}
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
-                key={`${presetKey ?? range}-${inflationView ? "real" : "nominal"}`}
+                key={`${lotBased ? "lots" : (presetKey ?? range)}-${
+                  inflationView ? "real" : "nominal"
+                }`}
                 variants={reduce ? undefined : crossFade}
                 initial={reduce ? false : "hidden"}
                 animate={reduce ? undefined : "show"}
@@ -195,6 +230,7 @@ export function Dashboard({ portfolio, onDelete }: Props) {
                   benchmarkLabel={data.benchmark}
                   valueKey={inflationView ? "real_value" : "value"}
                   valueLabel={inflationView ? "Value (today's $)" : "Value"}
+                  buyMarkers={data.buy_markers}
                 />
               </motion.div>
             </AnimatePresence>

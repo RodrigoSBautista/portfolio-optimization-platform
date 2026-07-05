@@ -59,11 +59,12 @@ export function NewPortfolio({
       : [],
   );
 
-  // Lot rows (Actual purchases mode). Seeded from initialLots for round-trip edit.
-  const lotKey = useRef(0);
-  const [lotRows, setLotRows] = useState<LotRow[]>(
-    (initialLots ?? []).map((l) => ({ key: lotKey.current++, ...l })),
+  // Lot rows (Actual purchases mode). Seeded from initialLots for round-trip
+  // edit; keys are index-based initially and the counter continues from there.
+  const [lotRows, setLotRows] = useState<LotRow[]>(() =>
+    (initialLots ?? []).map((l, i) => ({ key: i, ...l })),
   );
+  const lotKey = useRef(initialLots?.length ?? 0);
 
   // Contribution plan (weighted modes only).
   const [lumpSum, setLumpSum] = useState(1000);

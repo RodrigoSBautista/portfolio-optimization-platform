@@ -137,8 +137,12 @@ def _run_lot_simulation(
 
     The benchmark line invests each PLACED lot's dollars into the benchmark on the same
     date, so the two lines are apples-to-apples (identical cash flows, identical timing).
-    Dropped lots are excluded from the mirror so flows match exactly. ``prices`` must
-    reach back to ``min(lot.date)`` (the API fetches from there per the core contract).
+    Dropped lots are excluded from the mirror so flows match exactly. If the benchmark
+    listed AFTER an early lot, that mirror buy is clamped to the benchmark's first
+    trading day (the dollars still go in — on the earliest day the benchmark existed)
+    rather than being silently dropped, which would leave the two lines investing
+    unequal dollars and fake an outperformance. ``prices`` must reach back to
+    ``min(lot.date)`` (the API fetches from there per the core contract).
     """
     benchmark = (benchmark or spec.benchmark_symbol).upper()
     prices = prices.loc[:, ~prices.columns.duplicated()]
@@ -156,7 +160,15 @@ def _run_lot_simulation(
     benchmark_value = benchmark_index = None
     has_benchmark = benchmark in prices.columns and bool(placed)
     if has_benchmark:
-        mirror = [Lot(benchmark, lot.date, lot.amount) for lot in placed]
+        # Clamp each mirror buy to the benchmark's first trading day so a benchmark
+        # that listed after an early lot still receives every dollar (invested parity),
+        # instead of that mirror lot being dropped for lack of a price at its date.
+        bench_first = prices[benchmark].first_valid_index()
+        bench_start = bench_first.date() if bench_first is not None else None
+        mirror = [
+            Lot(benchmark, max(lot.date, bench_start) if bench_start else lot.date, lot.amount)
+            for lot in placed
+        ]
         bench_sim, _ = simulate_lots_detailed(prices, mirror)
         benchmark_value = bench_sim["value"]
         benchmark_index = bench_sim["twr_index"]

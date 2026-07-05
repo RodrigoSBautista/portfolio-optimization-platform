@@ -154,3 +154,32 @@ def test_format_metrics_adds_beta_alpha_with_benchmark():
     bench = pd.Series([1.0, 1.02, 1.05, 1.08], index=idx.index)
     out = format_metrics(idx, benchmark_index=bench)
     assert {"Beta", "Alpha (ann.)"} <= set(out)
+
+
+def test_lot_benchmark_invested_parity_when_benchmark_lists_late():
+    # Regression (review B1): a benchmark that listed AFTER an early lot must still
+    # receive every dollar — the early mirror buy is clamped to the benchmark's first
+    # trading day, not dropped (which would fake outperformance).
+    idx = pd.date_range("2020-01-02", periods=5, freq="B")  # Thu,Fri,Mon,Tue,Wed
+    prices = pd.DataFrame(
+        {
+            "AAPL": [10.0, 10.0, 10.0, 10.0, 10.0],  # flat -> value == invested
+            "SPY": [np.nan, np.nan, 100.0, 100.0, 100.0],  # lists on day 3 (Jan 6)
+        },
+        index=idx,
+    )
+    spec = PortfolioSpec(
+        name="p",
+        benchmark_symbol="SPY",
+        lots=[
+            Lot("AAPL", date(2020, 1, 2), 1000.0),  # before SPY exists
+            Lot("AAPL", date(2020, 1, 6), 500.0),
+        ],
+    )
+    res = run_simulation(spec, prices)
+    # Portfolio invested the full $1500 (flat AAPL -> value 1500 too).
+    assert res.sim["invested"].iloc[-1] == pytest.approx(1500.0)
+    assert res.sim["value"].iloc[-1] == pytest.approx(1500.0)
+    # Benchmark received the full $1500 (both mirror buys, the early one clamped to
+    # SPY's first day) -> flat SPY value 1500. The bug reported ~500 (dollars dropped).
+    assert res.benchmark_value.iloc[-1] == pytest.approx(1500.0)

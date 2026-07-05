@@ -36,7 +36,10 @@ interface LotRow {
 }
 
 function today(): string {
-  return new Date().toISOString().slice(0, 10);
+  // Local calendar date (toISOString is UTC — off by one around midnight).
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 export function NewPortfolio({
@@ -249,25 +252,27 @@ export function NewPortfolio({
               {lotRows.map((r) => (
                 <div
                   key={r.key}
-                  className="flex items-center gap-3 border-b border-edge/60 px-3 py-2 last:border-b-0 dark:border-edge-dark/60"
+                  className="flex flex-wrap items-center gap-3 border-b border-edge/60 px-3 py-2 last:border-b-0 dark:border-edge-dark/60"
                 >
                   <span className="w-16 text-sm font-medium">{r.symbol}</span>
                   <input
                     type="date"
                     max={maxDate}
                     value={r.date}
+                    aria-label={`${r.symbol} purchase date`}
                     onChange={(e) => setLotField(r.key, "date", e.target.value)}
-                    className="w-40 rounded-md border border-edge bg-surface px-2 py-1 text-sm outline-none focus:border-brand dark:border-edge-dark dark:bg-surface-dark-alt"
+                    className="w-40 min-w-0 rounded-md border border-edge bg-surface px-2 py-1 text-sm outline-none focus:border-brand dark:border-edge-dark dark:bg-surface-dark-alt"
                   />
                   <input
                     type="number"
                     min={0}
                     step={100}
                     value={r.amount}
+                    aria-label={`${r.symbol} amount invested in dollars`}
                     onChange={(e) =>
                       setLotField(r.key, "amount", Number(e.target.value))
                     }
-                    className="w-28 rounded-md border border-edge bg-surface px-2 py-1 text-sm outline-none focus:border-brand dark:border-edge-dark dark:bg-surface-dark-alt"
+                    className="w-28 min-w-0 rounded-md border border-edge bg-surface px-2 py-1 text-sm outline-none focus:border-brand dark:border-edge-dark dark:bg-surface-dark-alt"
                   />
                   <button
                     type="button"

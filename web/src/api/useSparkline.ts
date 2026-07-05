@@ -17,6 +17,7 @@ export function useSparkline(spec: PortfolioSpec, id: string | number) {
     holdings: spec.holdings,
     contributions: spec.contributions,
     benchmark: spec.benchmark_symbol,
+    lots: spec.lots ?? null,
   });
   return useQuery({
     queryKey: ["sparkline", id, specHash],

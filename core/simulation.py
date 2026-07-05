@@ -12,10 +12,12 @@ The result carries three series so the UI can tell the full story:
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 
 import pandas as pd
 from pandas.tseries.frequencies import to_offset
+
+from core.portfolio import Lot
 
 # Trading days per year (annualization / daily fee-decay factor).
 TRADING_DAYS = 252
@@ -200,3 +202,120 @@ def simulate_portfolio(
         {"value": values, "invested": invested_hist, "twr_index": twr_index},
         index=dates,
     )
+
+
+def simulate_lots_detailed(
+    prices: pd.DataFrame, lots: Sequence[Lot]
+) -> tuple[pd.DataFrame, list[Lot]]:
+    """Simulate a lot-based portfolio (each lot is a dated dollar purchase).
+
+    A lot is ``(symbol, date, amount)``: ``amount`` dollars of ``symbol`` bought at
+    the close of the FIRST trading day on/after ``date`` (forward snapping, so it is
+    look-ahead-safe). Multiple lots of one symbol accumulate shares.
+
+    Window: from the first trading day ``>= min(lot.date)`` through the last date in
+    ``prices``. Each involved symbol is forward-filled over the WHOLE window
+    independently (union calendar) — a late-listing symbol never truncates another's
+    history, and a symbol contributes 0 to ``value`` before its first lot lands.
+
+    Returns:
+        ``(frame, dropped)`` where ``frame`` is indexed by trading date with columns:
+          - ``value``     — Σ shares·price per day (market value);
+          - ``invested``  — cumulative lot amounts at their snap dates (step function);
+          - ``twr_index`` — time-weighted growth of $1; the daily factor is the value
+            of EXISTING holdings before that day's buys over the previous value, so
+            lot inflows never count as gains.
+        ``dropped`` lists lots that could not be placed: symbol absent from ``prices``,
+        symbol not yet trading at its snap date (no price there), or a date after the
+        last trading day. The same list is also attached as
+        ``frame.attrs["dropped_lots"]`` so callers holding only the frame can reach it.
+
+    Raises:
+        ValueError: if any lot amount is non-positive, or if no lot survives
+            (``"no usable lots"``).
+    """
+    cleaned: list[Lot] = []
+    for lot in lots:
+        amount = float(lot.amount)
+        if amount <= 0:
+            raise ValueError("lot amounts must be positive")
+        cleaned.append(Lot(str(lot.symbol).upper(), lot.date, amount))
+    if not cleaned:
+        raise ValueError("no usable lots")
+
+    # Dedupe duplicate ticker columns (benchmark-as-holding guard) and sort by date.
+    px_all = prices.loc[:, ~prices.columns.duplicated()].sort_index()
+    col_map = {str(c).upper(): c for c in px_all.columns}
+    full_index = px_all.index
+
+    window_ref = pd.Timestamp(min(lot.date for lot in cleaned))
+    start_pos = full_index.searchsorted(window_ref, side="left")
+    if start_pos >= len(full_index):
+        # Even the earliest lot falls after the last trading day.
+        raise ValueError("no usable lots")
+    window_start = full_index[start_pos]
+
+    involved = [col_map[s] for s in {lot.symbol for lot in cleaned} if s in col_map]
+    # Slice to the window first, then ffill — mirrors ``_align`` (look-ahead-safe),
+    # but WITHOUT intersecting the per-symbol windows, so late listings don't truncate.
+    px = px_all.loc[window_start:, involved].ffill() if involved else px_all.iloc[0:0]
+    win_index = px.index
+    pxv = px.fillna(0.0)  # pre-listing NaNs -> 0 (shares are 0 there anyway)
+
+    dropped: list[Lot] = []
+    buys_by_day: dict[pd.Timestamp, list[tuple[object, float, float]]] = {}
+    for lot in cleaned:
+        col = col_map.get(lot.symbol)
+        if col is None:
+            dropped.append(lot)  # symbol has no price data at all
+            continue
+        pos = win_index.searchsorted(pd.Timestamp(lot.date), side="left")
+        if pos >= len(win_index):
+            dropped.append(lot)  # date snaps past the last trading day
+            continue
+        snap = win_index[pos]
+        price = px.at[snap, col]
+        if pd.isna(price):
+            dropped.append(lot)  # symbol not yet trading at its snap date
+            continue
+        buys_by_day.setdefault(snap, []).append((col, lot.amount / float(price), lot.amount))
+
+    if not buys_by_day:
+        raise ValueError("no usable lots")
+
+    shares = pd.Series(0.0, index=px.columns)
+    invested = 0.0
+    prev_value = 0.0
+    values: list[float] = []
+    invested_hist: list[float] = []
+    twr_factors: list[float] = []
+    for day in win_index:
+        prow = pxv.loc[day]
+        # Value of EXISTING holdings before today's buys -> time-weighted factor.
+        value_before = float((shares * prow).sum())
+        twr_factors.append(value_before / prev_value if prev_value > 0 else 1.0)
+        for col, sh, amt in buys_by_day.get(day, ()):
+            shares[col] += sh
+            invested += amt
+        value_after = float((shares * prow).sum())
+        values.append(value_after)
+        invested_hist.append(invested)
+        prev_value = value_after
+
+    twr_index = pd.Series(twr_factors, index=win_index).cumprod()
+    frame = pd.DataFrame(
+        {"value": values, "invested": invested_hist, "twr_index": twr_index},
+        index=win_index,
+    )
+    frame.attrs["dropped_lots"] = dropped
+    return frame, dropped
+
+
+def simulate_lots(prices: pd.DataFrame, lots: Sequence[Lot]) -> pd.DataFrame:
+    """Lot-based simulation; thin wrapper over :func:`simulate_lots_detailed`.
+
+    Returns just the ``value``/``invested``/``twr_index`` frame. Dropped lots stay
+    programmatically reachable via ``frame.attrs["dropped_lots"]``.
+    """
+    frame, _ = simulate_lots_detailed(prices, lots)
+    return frame
